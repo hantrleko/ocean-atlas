@@ -5,6 +5,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { SPECIES } from './species.js';
 import { build, glowMats, loadCreature } from './creatures.js';
+import { uniqueBehaviors, behaviorLabel } from './aliveMotion.js';
 
 const $ = s => document.querySelector(s), body = document.body;
 const canvas = $('#c'), R = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
@@ -100,6 +101,38 @@ function navBuild() {
   $('#featCap').textContent = f.caption; $('#featGo').onclick = () => select(3);
 }
 
+let actionMode = 'auto'; // UI selection; applied to cur on select / chip click
+
+function rebuildActions(speciesId) {
+  const el = $('#actions');
+  if (!el) return;
+  const behaviors = uniqueBehaviors(speciesId);
+  const chips = [
+    { id: 'auto', label: '自动' },
+    ...behaviors.map(b => ({ id: b.id, label: behaviorLabel(b.id) })),
+  ];
+  el.innerHTML = chips.map(c =>
+    `<button type="button" role="tab" data-b="${c.id}" class="${c.id === actionMode ? 'on' : ''}">${c.label}</button>`
+  ).join('');
+}
+
+function applyActionMode() {
+  if (!cur) return;
+  const mode = cur.setMode?.(actionMode) ?? actionMode;
+  // Sync chip .on (in case setMode remapped id)
+  document.querySelectorAll('#actions button').forEach(b => {
+    b.classList.toggle('on', b.dataset.b === (actionMode === 'auto' ? 'auto' : mode));
+  });
+}
+
+$('#actions')?.addEventListener('click', e => {
+  const btn = e.target.closest('button[data-b]');
+  if (!btn) return;
+  actionMode = btn.dataset.b;
+  document.querySelectorAll('#actions button').forEach(b => b.classList.toggle('on', b === btn));
+  applyActionMode();
+});
+
 function info(s) {
   const el = $('#info'); el.classList.remove('swap'); void el.offsetWidth; el.classList.add('swap');
   setTimeout(() => {
@@ -121,6 +154,8 @@ async function select(i, instant) {
   idx = i;
   const s = SPECIES[i];
   const token = ++loadToken;
+  actionMode = 'auto';
+  rebuildActions(s.id);
   info(s);
   applyTheme();
   vY = instant ? 0 : 0.05;
@@ -141,6 +176,7 @@ async function select(i, instant) {
   stage.add(n.g);
   flights.push({ o: n, t: instant ? 1 : 0, out: false });
   cur = n;
+  applyActionMode();
 }
 
 const ease = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
@@ -230,7 +266,7 @@ const upPtr = e => { ptrs.delete(e.pointerId); if (!ptrs.size) { drag = null; ca
 canvas.addEventListener('pointerup', upPtr); canvas.addEventListener('pointercancel', upPtr);
 const pdist = () => { const [a, b] = [...ptrs.values()]; return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY); };
 addEventListener('wheel', e => {
-  if (e.target.closest('#right,#left,#carousel')) return;
+  if (e.target.closest('#right,#left,#carousel,#actions')) return;
   e.preventDefault(); zoomBy(e.deltaY * 0.004);
 }, { passive: false });
 function zoomBy(d) { tDist = Math.max(3.6, Math.min(12, tDist + d)); setImm(tDist < 6.6); }

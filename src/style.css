@@ -75,6 +75,39 @@ body.imm .carousel{transform:translateY(-140%);opacity:0}
 body.imm #tools{transform:translate(-200px,-50%);opacity:0}
 body.imm #cap{opacity:0;transform:translateY(30px)}body.imm #hint{opacity:1;transform:translate(-50%,0)}
 
+
+/* Behavior / action chips */
+#actions{
+  position:fixed;
+  left:270px;right:378px;
+  bottom:108px;
+  display:flex;justify-content:center;align-items:center;
+  flex-wrap:wrap;gap:8px;
+  z-index:4;
+  pointer-events:none;
+  transition:opacity .6s,transform .7s;
+}
+#actions button{
+  pointer-events:auto;
+  flex:0 0 auto;
+  border:1px solid var(--line);
+  background:var(--glass);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:12px;
+  letter-spacing:1px;
+  padding:7px 14px;
+  border-radius:99px;
+  cursor:pointer;
+  transition:.25s;
+  white-space:nowrap;
+}
+#actions button:hover{border-color:var(--acc);transform:translateY(-1px)}
+#actions button.on{background:var(--ink);color:var(--bg1);border-color:transparent}
+body.dark #actions button.on{background:var(--acc);color:#04151c;box-shadow:0 0 18px rgba(62,230,216,.3)}
+body.imm #actions{opacity:0;transform:translateY(20px);pointer-events:none}
+
 /* Mobile chrome — hidden on desktop */
 #menuBtn,#backdrop,#sheetHandle{display:none}
 
@@ -181,6 +214,24 @@ body.imm #cap{opacity:0;transform:translateY(30px)}body.imm #hint{opacity:1;tran
   }
   body.sheet-open #hint{bottom:calc(70vh + 52px + env(safe-area-inset-bottom,0px))}
   body.imm #hint{opacity:1;transform:translate(-50%,0)}
+
+  #actions{
+    left:12px;right:12px;
+    bottom:calc(36vh + 72px + env(safe-area-inset-bottom,0px));
+    flex-wrap:nowrap;
+    justify-content:flex-start;
+    overflow-x:auto;
+    overflow-y:hidden;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+    gap:6px;
+    padding:2px 4px 6px;
+    mask-image:linear-gradient(90deg,transparent,#000 4%,#000 96%,transparent);
+  }
+  #actions::-webkit-scrollbar{display:none}
+  #actions button{font-size:11px;padding:6px 12px}
+  body.sheet-open #actions{bottom:calc(70vh + 72px + env(safe-area-inset-bottom,0px))}
+  body.imm #actions{opacity:0;pointer-events:none}
 }
 
 /* ========== Small phones ≤480px ========== */
@@ -201,6 +252,8 @@ body.imm #cap{opacity:0;transform:translateY(30px)}body.imm #hint{opacity:1;tran
   #menuBtn{width:40px;height:40px}
   #hint{bottom:calc(34vh + 48px + env(safe-area-inset-bottom,0px))}
   body.sheet-open #hint{bottom:calc(70vh + 48px + env(safe-area-inset-bottom,0px))}
+  #actions{bottom:calc(34vh + 64px + env(safe-area-inset-bottom,0px))}
+  body.sheet-open #actions{bottom:calc(70vh + 64px + env(safe-area-inset-bottom,0px))}
 }
 
 /* ========== JS fallback: body.mobile (Safari "Request Desktop Website") ==========
@@ -306,4 +359,22 @@ body.mobile #hint{
 }
 body.mobile.sheet-open #hint{bottom:calc(70vh + 52px + env(safe-area-inset-bottom,0px))}
 body.mobile.imm #hint{opacity:1;transform:translate(-50%,0)}
+
+body.mobile #actions{
+  left:12px;right:12px;
+  bottom:calc(36vh + 72px + env(safe-area-inset-bottom,0px));
+  flex-wrap:nowrap;
+  justify-content:flex-start;
+  overflow-x:auto;
+  overflow-y:hidden;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:none;
+  gap:6px;
+  padding:2px 4px 6px;
+  mask-image:linear-gradient(90deg,transparent,#000 4%,#000 96%,transparent);
+}
+body.mobile #actions::-webkit-scrollbar{display:none}
+body.mobile #actions button{font-size:11px;padding:6px 12px}
+body.mobile.sheet-open #actions{bottom:calc(70vh + 72px + env(safe-area-inset-bottom,0px))}
+body.mobile.imm #actions{opacity:0;pointer-events:none}
 

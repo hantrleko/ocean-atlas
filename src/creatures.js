@@ -164,7 +164,7 @@ hammer() {
   return { g, up: t => { tail.rotation.y = Math.sin(t * 2.2) * 0.35; body.rotation.y = Math.sin(t * 2.2) * 0.03; g.rotation.y = Math.sin(t * 2.2 + Math.PI) * 0.06; pecs.forEach((p, i) => p.rotation.x = (i ? -1 : 1) * Math.sin(t) * 0.12); g.position.y = Math.sin(t * 1.1) * 0.06; } };
 },
 };
-export function build(id) { const r = B[id](); const box = new THREE.Box3().setFromObject(r.g); const s = box.getSize(new THREE.Vector3()); const k = 3.3 / Math.max(s.x, s.y, s.z * 1.2); const c = box.getCenter(new THREE.Vector3()); const outer = new THREE.Group(); const inner = new THREE.Group(); inner.add(r.g); inner.scale.setScalar(k); inner.position.copy(c).multiplyScalar(-k); outer.add(inner); r.g.traverse(o => { if (o.isMesh) o.castShadow = true; }); return { g: outer, raw: r.g, up: r.up, k }; }
+export function build(id) { const r = B[id](); const box = new THREE.Box3().setFromObject(r.g); const s = box.getSize(new THREE.Vector3()); const k = 3.3 / Math.max(s.x, s.y, s.z * 1.2); const c = box.getCenter(new THREE.Vector3()); const outer = new THREE.Group(); const inner = new THREE.Group(); inner.add(r.g); inner.scale.setScalar(k); inner.position.copy(c).multiplyScalar(-k); outer.add(inner); r.g.traverse(o => { if (o.isMesh) o.castShadow = true; }); const setMode = () => 'auto'; const getMode = () => 'auto'; r.up.setMode = setMode; r.up.getMode = getMode; return { g: outer, raw: r.g, up: r.up, setMode, getMode, k }; }
 
 
 /** Species ids that prefer a GLB under /models/${id}.glb */
@@ -225,8 +225,8 @@ export async function loadCreature(id) {
     // Clone materials + inject GPU alive displacement BEFORE wrap so bbox axes match mesh local space
     const alive = applyAliveMotion(raw, id);
     const { outer, k } = wrapModel(raw, 2.8, true);
-    const up = makeAliveUpdater(raw, id, alive);
-    return { g: outer, raw, up, k };
+    const ctrl = makeAliveUpdater(raw, id, alive);
+    return { g: outer, raw, up: ctrl.up, setMode: ctrl.setMode, getMode: ctrl.getMode, k };
   } catch (err) {
     console.warn(`[ocean-atlas] GLB load failed for ${id}, using procedural:`, err?.message || err);
     return build(id);
