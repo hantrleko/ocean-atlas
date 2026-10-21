@@ -190,12 +190,14 @@ function applyTheme() {
   // fog + bloom
   if (dark) {
     scene.fog = new THREE.FogExp2(0x071018, 0.045);
-    bloom.strength = 0.45;
+    bloomBase.strength = 0.45;
+    bloom.strength = isMobile() ? bloomBase.strength * bloomBase.mobileScale : bloomBase.strength;
     bloom.threshold = 0.85;
     bloom.radius = 0.45;
   } else {
     scene.fog = new THREE.FogExp2(0xe8e0d0, 0.022);
-    bloom.strength = 0.12;
+    bloomBase.strength = 0.12;
+    bloom.strength = isMobile() ? bloomBase.strength * bloomBase.mobileScale : bloomBase.strength;
     bloom.threshold = 0.92;
     bloom.radius = 0.35;
   }
@@ -204,7 +206,7 @@ function applyTheme() {
 
 $('#theme').onclick = () => {
   body.classList.toggle('dark'); body.classList.toggle('light');
-  applyTheme(); localStorage.oaTheme = body.className;
+  applyTheme(); localStorage.oaTheme = body.classList.contains('dark') ? 'dark' : 'light';
 };
 
 // orbit
@@ -263,16 +265,62 @@ q.onkeydown = e => {
     if (m[0]) { select(m[0][1]); res.style.display = 'none'; q.value = ''; q.blur(); }
   }
 };
-$('#bSearch').onclick = () => { setImm(false); tDist = Math.max(tDist, 9); q.focus(); };
+$('#bSearch').onclick = () => { setImm(false); tDist = Math.max(tDist, 9); if (isMobile()) body.classList.add('sheet-open'); q.focus(); };
+
+const MQ_MOBILE = matchMedia('(max-width:820px)');
+const DEG_DESK = '360° 拖动旋转 · 滚轮缩放';
+const DEG_MOB = '单指拖动旋转 · 双指缩放';
+const HINT_DESK = '滚轮 / 双指缩小以退出沉浸模式';
+const HINT_MOB = '双指缩小以退出沉浸模式';
+let bloomBase = { strength: 0.2, mobileScale: 0.75 };
+
+function isMobile() { return MQ_MOBILE.matches || innerWidth < 820; }
+
+function syncMobileChrome() {
+  const mob = isMobile();
+  body.classList.toggle('mobile', mob);
+  if (!mob) {
+    body.classList.remove('nav-open', 'sheet-open');
+  }
+  const deg = $('#degTxt'), hint = $('#hint');
+  if (deg) deg.textContent = mob ? DEG_MOB : DEG_DESK;
+  if (hint) hint.textContent = mob ? HINT_MOB : HINT_DESK;
+}
+
+function closeNav() { body.classList.remove('nav-open'); }
 
 function resize() {
   const w = innerWidth, h = innerHeight;
+  const mob = isMobile();
+  const pr = mob
+    ? Math.min(devicePixelRatio, w < 480 ? 1.25 : 1.5)
+    : Math.min(devicePixelRatio, 2);
+  R.setPixelRatio(pr);
+  DR.setPixelRatio(Math.min(pr, 1.5));
   R.setSize(w, h, false);
   cam.aspect = w / h; cam.updateProjectionMatrix();
   composer.setSize(w, h);
   bloom.setSize(w, h);
+  // soften bloom a bit on phones
+  if (mob) bloom.strength = bloomBase.strength * bloomBase.mobileScale;
+  else bloom.strength = bloomBase.strength;
+  syncMobileChrome();
 }
-addEventListener('resize', resize); resize();
+addEventListener('resize', resize);
+MQ_MOBILE.addEventListener?.('change', resize);
+resize();
+
+// mobile menu + bottom sheet
+const menuBtn = $('#menuBtn'), backdrop = $('#backdrop'), sheetHandle = $('#sheetHandle');
+menuBtn?.addEventListener('click', () => {
+  body.classList.toggle('nav-open');
+  if (body.classList.contains('nav-open')) setImm(false);
+});
+backdrop?.addEventListener('click', closeNav);
+sheetHandle?.addEventListener('click', () => body.classList.toggle('sheet-open'));
+// close drawer after nav pick on mobile
+$('#nav')?.addEventListener('click', () => { if (isMobile()) closeNav(); });
+$('#featGo')?.addEventListener('click', () => { if (isMobile()) closeNav(); });
 
 let last = performance.now(), T0 = last; let fr = 0; const tmp = new THREE.Vector3();
 function loop() {
@@ -304,10 +352,12 @@ function loop() {
 }
 
 // default theme: light (HTML body.light). Restore dark only if user chose it.
-if (localStorage.oaTheme?.includes('dark')) body.className = 'dark';
-else if (!body.classList.contains('dark')) body.className = 'light';
+if (localStorage.oaTheme?.includes('dark')) { body.classList.add('dark'); body.classList.remove('light'); }
+else { body.classList.add('light'); body.classList.remove('dark'); }
 const hp = new URLSearchParams(location.search);
-if (hp.get('theme')) body.className = hp.get('theme');
+if (hp.get('theme') === 'dark') { body.classList.add('dark'); body.classList.remove('light'); }
+if (hp.get('theme') === 'light') { body.classList.add('light'); body.classList.remove('dark'); }
+syncMobileChrome();
 applyTheme();
 navBuild();
 select(+(hp.get('s') || 0), true).then(() => {
