@@ -1,9 +1,11 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>深海图鉴 · Ocean Atlas</title>  <script type="module" crossorigin src="./assets/index-dRpHyYPf.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-hIKianaY.css">
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>深海图鉴 · Ocean Atlas</title>  <script type="module" crossorigin src="./assets/index-DjAr2iZl.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DD7nul5y.css">
 </head>
 <body class="light">
 <canvas id="c"></canvas>
+<button id="menuBtn" type="button" aria-label="打开菜单" title="菜单">☰</button>
+<div id="backdrop" aria-hidden="true"></div>
 <aside id="left" class="glass">
   <div class="logo"><span class="mark"></span><div><b>深海图鉴</b><small>OCEAN ATLAS</small></div></div>
   <nav id="nav"></nav>
@@ -13,6 +15,7 @@
 <div id="tools"><button id="bSearch" title="搜索">⌕</button><button id="bZoom" title="沉浸">⤢</button><button id="bReset" title="重置">↺</button></div>
 <footer id="cap"><p id="caption"></p><div class="deg"><span class="ring"><span id="dot"></span></span><span id="degTxt">360° 拖动旋转 · 滚轮缩放</span></div></footer>
 <aside id="right" class="glass">
+  <button id="sheetHandle" type="button" aria-label="展开详情" title="展开 / 收起"><span class="bar"></span></button>
   <div class="top"><div class="search"><span>⌕</span><input id="q" placeholder="搜索物种 / 拉丁名…"><div id="results"></div></div><button id="theme" title="切换主题"><span class="sun">☀</span><span class="moon">☾</span></button></div>
   <div id="info"><small id="fam"></small><h1 id="title"></h1><i id="latin"></i><div id="tags"></div><p id="desc"></p>
    <h3>关键特征 · KEY TRAITS</h3><table id="traits"></table>
