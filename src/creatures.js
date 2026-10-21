@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { applyAliveMotion, makeAliveUpdater } from './aliveMotion.js';
 const S = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.55, metalness: 0.05, ...o });
 const P = (c, o = {}) => new THREE.MeshPhysicalMaterial({ color: c, roughness: 0.2, transparent: true, opacity: 0.45, clearcoat: 1, depthWrite: false, side: THREE.DoubleSide, ...o });
@@ -170,11 +171,18 @@ export function build(id) { const r = B[id](); const box = new THREE.Box3().setF
 /** Species ids that prefer a GLB under /models/${id}.glb */
 export const GLB_IDS = new Set(['vampire','nautilus','dumbo','angler','barreleye','gulper','jelly','physalia','whale','turtle','hammer']);
 
+/** Skinned + AnimationMixer GLBs (skip GPU aliveMotion to avoid double deform). */
+export const RIGGED_IDS = new Set(['angler', 'whale', 'turtle', 'dumbo']);
+
+const CLIP_IDLE_BEHAVIORS = new Set(['rest', 'idle', 'display', 'court']);
+const CLIP_LURE_BEHAVIORS = new Set(['hunt', 'lure']);
+const FADE_SEC = 0.3;
+
 const gltfLoader = new GLTFLoader();
 const dracoLoader = new DRACOLoader();
 dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
 gltfLoader.setDRACOLoader(dracoLoader);
-/** Cached parsed scenes — we clone per display so fly-out can dispose safely. */
+/** Cached { scene, animations } — we clone per display so fly-out can dispose safely. */
 const glbCache = new Map();
 
 function wrapModel(raw, targetSize, fromGlb) {
@@ -206,10 +214,93 @@ function wrapModel(raw, targetSize, fromGlb) {
   return { outer, k };
 }
 
+function cloneMaterials(root) {
+  root.traverse(o => {
+    if (!o.isMesh || !o.material) return;
+    if (Array.isArray(o.material)) o.material = o.material.map(m => m.clone());
+    else o.material = o.material.clone();
+  });
+}
+
+/** Map UI behavior id → AnimationClip for a rigged species. */
+function clipForBehavior(id, behaviorId, clips) {
+  if (id === 'angler') {
+    if (CLIP_LURE_BEHAVIORS.has(behaviorId)) return clips.lure || clips.swim;
+    return clips.swim;
+  }
+  // whale / turtle / dumbo
+  if (CLIP_IDLE_BEHAVIORS.has(behaviorId)) return clips.idle || clips.swim;
+  return clips.swim;
+}
+
 /**
- * Async creature loader. For vampire / nautilus tries GLB first;
+ * AnimationMixer controller for skinned GLBs.
+ * setMode keeps chip API; auto → swim; locked behaviors map to swim/lure/idle.
+ */
+function makeRiggedUpdater(raw, outer, id, mixer, clips) {
+  let mode = 'auto';
+  let currentAction = null;
+  let lastT = null;
+
+  function playClip(clip, fade = FADE_SEC) {
+    if (!clip) return;
+    const next = mixer.clipAction(clip);
+    if (currentAction === next && next.isRunning()) return;
+    next.enabled = true;
+    next.reset();
+    next.setLoop(THREE.LoopRepeat, Infinity);
+    next.clampWhenFinished = false;
+    if (fade <= 0 || !currentAction) {
+      next.weight = 1;
+      next.play();
+      if (currentAction && currentAction !== next) {
+        currentAction.stop();
+      }
+    } else {
+      next.fadeIn(fade).play();
+      currentAction.fadeOut(fade);
+    }
+    currentAction = next;
+  }
+
+  playClip(clips.swim, 0);
+
+  function setMode(m) {
+    if (m == null || m === 'auto') {
+      mode = 'auto';
+      playClip(clips.swim);
+      return 'auto';
+    }
+    mode = m;
+    playClip(clipForBehavior(id, m, clips));
+    return mode;
+  }
+
+  function getMode() {
+    return mode;
+  }
+
+  function up(t, dt) {
+    let d = dt;
+    if (d == null || Number.isNaN(d)) {
+      if (lastT == null) lastT = t;
+      d = Math.min(Math.max(t - lastT, 0), 0.05);
+    }
+    lastT = t;
+    mixer.update(d);
+    // Subtle rigid bob on wrap group only — no GPU displace on skinned mesh
+    if (outer) outer.position.y = Math.sin(t * 0.9) * 0.025;
+  }
+
+  up.setMode = setMode;
+  up.getMode = getMode;
+  return { up, setMode, getMode, mixer };
+}
+
+/**
+ * Async creature loader. Tries GLB first;
  * falls back to procedural build() if missing or load fails.
- * Returns { g, raw, up, k } matching build().
+ * Returns { g, raw, up, setMode, getMode, k, mixer? } matching build().
  */
 export async function loadCreature(id) {
   if (!GLB_IDS.has(id)) return build(id);
@@ -218,11 +309,24 @@ export async function loadCreature(id) {
     if (!template) {
       const url = `${import.meta.env.BASE_URL}models/${id}.glb`;
       const gltf = await gltfLoader.loadAsync(url);
-      template = gltf.scene;
+      template = { scene: gltf.scene, animations: gltf.animations || [] };
       glbCache.set(id, template);
     }
-    const raw = template.clone(true);
-    // Clone materials + inject GPU alive displacement BEFORE wrap so bbox axes match mesh local space
+    const useRig = RIGGED_IDS.has(id) && template.animations.length > 0;
+    const raw = useRig ? SkeletonUtils.clone(template.scene) : template.scene.clone(true);
+    cloneMaterials(raw);
+
+    if (useRig) {
+      const { outer, k } = wrapModel(raw, 2.8, true);
+      const mixer = new THREE.AnimationMixer(raw);
+      const clips = Object.fromEntries(template.animations.map(a => [a.name, a]));
+      const ctrl = makeRiggedUpdater(raw, outer, id, mixer, clips);
+      return {
+        g: outer, raw, up: ctrl.up, setMode: ctrl.setMode, getMode: ctrl.getMode, k, mixer,
+      };
+    }
+
+    // Static GLB: GPU alive displacement + behavioral rigid pose
     const alive = applyAliveMotion(raw, id);
     const { outer, k } = wrapModel(raw, 2.8, true);
     const ctrl = makeAliveUpdater(raw, id, alive);
