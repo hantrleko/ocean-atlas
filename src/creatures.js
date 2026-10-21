@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { applyAliveMotion, makeAliveUpdater } from './aliveMotion.js';
 const S = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.55, metalness: 0.05, ...o });
 const P = (c, o = {}) => new THREE.MeshPhysicalMaterial({ color: c, roughness: 0.2, transparent: true, opacity: 0.45, clearcoat: 1, depthWrite: false, side: THREE.DoubleSide, ...o });
 export const glowMats = [];
@@ -221,11 +222,10 @@ export async function loadCreature(id) {
       glbCache.set(id, template);
     }
     const raw = template.clone(true);
+    // Clone materials + inject GPU alive displacement BEFORE wrap so bbox axes match mesh local space
+    const alive = applyAliveMotion(raw, id);
     const { outer, k } = wrapModel(raw, 2.8, true);
-    const up = t => {
-      raw.position.y = Math.sin(t * 1.2) * 0.06;
-      raw.rotation.y = Math.sin(t * 0.35) * 0.1;
-    };
+    const up = makeAliveUpdater(raw, id, alive);
     return { g: outer, raw, up, k };
   } catch (err) {
     console.warn(`[ocean-atlas] GLB load failed for ${id}, using procedural:`, err?.message || err);
