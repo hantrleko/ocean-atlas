@@ -274,13 +274,22 @@ const HINT_DESK = '滚轮 / 双指缩小以退出沉浸模式';
 const HINT_MOB = '双指缩小以退出沉浸模式';
 let bloomBase = { strength: 0.2, mobileScale: 0.75 };
 
-function isMobile() { return MQ_MOBILE.matches || innerWidth < 820; }
+function isMobile() {
+  return innerWidth <= 820
+    || screen.width <= 820
+    || matchMedia('(max-width:820px)').matches
+    || matchMedia('(hover:none) and (pointer:coarse) and (max-width:1024px)').matches;
+}
 
 function syncMobileChrome() {
   const mob = isMobile();
+  const wasMob = body.classList.contains('mobile');
   body.classList.toggle('mobile', mob);
   if (!mob) {
     body.classList.remove('nav-open', 'sheet-open');
+  } else if (!wasMob) {
+    // entering mobile — keep sheet collapsed
+    body.classList.remove('sheet-open');
   }
   const deg = $('#degTxt'), hint = $('#hint');
   if (deg) deg.textContent = mob ? DEG_MOB : DEG_DESK;
@@ -308,16 +317,23 @@ function resize() {
 }
 addEventListener('resize', resize);
 MQ_MOBILE.addEventListener?.('change', resize);
+matchMedia('(hover:none) and (pointer:coarse) and (max-width:1024px)').addEventListener?.('change', resize);
 resize();
 
 // mobile menu + bottom sheet
 const menuBtn = $('#menuBtn'), backdrop = $('#backdrop'), sheetHandle = $('#sheetHandle');
 menuBtn?.addEventListener('click', () => {
   body.classList.toggle('nav-open');
-  if (body.classList.contains('nav-open')) setImm(false);
+  if (body.classList.contains('nav-open')) {
+    body.classList.remove('sheet-open');
+    setImm(false);
+  }
 });
 backdrop?.addEventListener('click', closeNav);
-sheetHandle?.addEventListener('click', () => body.classList.toggle('sheet-open'));
+sheetHandle?.addEventListener('click', () => {
+  body.classList.toggle('sheet-open');
+  if (body.classList.contains('sheet-open')) closeNav();
+});
 // close drawer after nav pick on mobile
 $('#nav')?.addEventListener('click', () => { if (isMobile()) closeNav(); });
 $('#featGo')?.addEventListener('click', () => { if (isMobile()) closeNav(); });
