@@ -131,6 +131,19 @@ export function behaviorLabel(id) {
   return BEHAVIOR_LABELS[id] || id;
 }
 
+/** Unique behavior entries for a species (dedupe repeated ids in cycle). */
+export function uniqueBehaviors(speciesId) {
+  const list = (MOTION[speciesId] || MOTION.nautilus).behaviors || [];
+  const seen = new Set();
+  const out = [];
+  for (const b of list) {
+    if (seen.has(b.id)) continue;
+    seen.add(b.id);
+    out.push(b);
+  }
+  return out;
+}
+
 const KIND_CODE = { fish: 0, soft: 1, jelly: 2, tendril: 3, turtle: 4, shell: 5 };
 
 const DEFAULT_BEHAVIOR = {
@@ -308,8 +321,10 @@ function patchMaterial(mat, uniforms) {
  */
 function ampForMesh(profile, halfLen) {
   // Treat profile.undulate as fraction of body half-length (museum-subtle)
-  const frac = profile.undulate;
-  // Map: undulate 0.04 → ~4% of half-length displacement at peak
+  // Soften stiffness: fish/soft/jelly/turtle get ~12% more body undulation
+  const softKinds = { fish: 1, soft: 1, jelly: 1, turtle: 1, tendril: 1 };
+  const boost = softKinds[profile.kind] ? 1.12 : 1.05;
+  const frac = profile.undulate * boost;
   return Math.max(halfLen * frac * 0.9, 0.002);
 }
 
@@ -403,6 +418,7 @@ function sampleBehaviors(behaviors, t, phase) {
  * @param {THREE.Object3D} raw — the cloned scene root inside wrapModel
  * @param {string} speciesId
  * @param {{sharedTime: object, profile: object, baseAmp?: number, baseFreq?: number, uniformSets?: object[]}} alive
+ * @returns {{ up: function, setMode: function, getMode: function }}
  */
 export function makeAliveUpdater(raw, speciesId, alive) {
   const { sharedTime, profile } = alive;
@@ -425,20 +441,97 @@ export function makeAliveUpdater(raw, speciesId, alive) {
   // Deduplicate by object identity
   const uniq = [...new Set(uniformSets)];
 
-  return function up(t) {
+  let mode = 'auto'; // 'auto' | behavior id
+  let locked = null;
+  let lockFrom = {
+    pose: [0, 0, 0],
+    amp: 1,
+    freq: 1,
+    bob: 1,
+    sway: 1,
+  };
+  let lockT0 = null; // absolute t when lock/blend started
+  const LOCK_BLEND = 0.85;
+
+  // Last applied multipliers (for smooth lock transitions)
+  let lastPose = [0, 0, 0];
+  let lastAmp = 1;
+  let lastFreq = 1;
+  let lastBob = 1;
+  let lastSway = 1;
+
+  function findBehavior(id) {
+    return behaviors.find(b => b.id === id) || behaviors[0] || DEFAULT_BEHAVIOR;
+  }
+
+  function setMode(id) {
+    if (id == null || id === 'auto') {
+      mode = 'auto';
+      locked = null;
+      lockT0 = null;
+      return 'auto';
+    }
+    const b = findBehavior(id);
+    mode = b.id;
+    locked = b;
+    lockFrom = {
+      pose: lastPose.slice(),
+      amp: lastAmp,
+      freq: lastFreq,
+      bob: lastBob,
+      sway: lastSway,
+    };
+    lockT0 = null; // set on next up(t)
+    return mode;
+  }
+
+  function getMode() {
+    return mode;
+  }
+
+  function up(t) {
     sharedTime.value = t;
 
-    const { cur, nxt, e } = sampleBehaviors(behaviors, t, phase);
-    const pose = lerp3(cur.pose || [0, 0, 0], nxt.pose || [0, 0, 0], e);
-    const ampMult = lerp(cur.amp ?? 1, nxt.amp ?? 1, e);
-    const freqMult = lerp(cur.freq ?? 1, nxt.freq ?? 1, e);
-    const bobMult = lerp(cur.bob ?? 1, nxt.bob ?? 1, e);
-    const swayMult = lerp(cur.sway ?? 1, nxt.sway ?? 1, e);
+    let pose;
+    let ampMult;
+    let freqMult;
+    let bobMult;
+    let swayMult;
+
+    if (mode === 'auto' || !locked) {
+      const { cur, nxt, e } = sampleBehaviors(behaviors, t, phase);
+      pose = lerp3(cur.pose || [0, 0, 0], nxt.pose || [0, 0, 0], e);
+      ampMult = lerp(cur.amp ?? 1, nxt.amp ?? 1, e);
+      freqMult = lerp(cur.freq ?? 1, nxt.freq ?? 1, e);
+      bobMult = lerp(cur.bob ?? 1, nxt.bob ?? 1, e);
+      swayMult = lerp(cur.sway ?? 1, nxt.sway ?? 1, e);
+    } else {
+      if (lockT0 == null) lockT0 = t;
+      const e = smoothstep(0, LOCK_BLEND, t - lockT0);
+      const tgt = locked;
+      pose = lerp3(lockFrom.pose, tgt.pose || [0, 0, 0], e);
+      ampMult = lerp(lockFrom.amp, tgt.amp ?? 1, e);
+      freqMult = lerp(lockFrom.freq, tgt.freq ?? 1, e);
+      bobMult = lerp(lockFrom.bob, tgt.bob ?? 1, e);
+      swayMult = lerp(lockFrom.sway, tgt.sway ?? 1, e);
+    }
+
+    // Never freeze — keep visible undulation / bob / sway even on "rest"
+    ampMult = Math.max(ampMult, 0.5);
+    bobMult = Math.max(bobMult, 0.45);
+    swayMult = Math.max(swayMult, 0.45);
+    freqMult = Math.max(freqMult, 0.55);
+
+    lastPose = pose;
+    lastAmp = ampMult;
+    lastFreq = freqMult;
+    lastBob = bobMult;
+    lastSway = swayMult;
 
     const bob = Math.sin(t * (profile.freq * 0.55 * freqMult) + phase) * profile.bob * bobMult;
-    const yawW = Math.sin(t * 0.35 + phase) * profile.yaw * 0.35 * swayMult;
-    const pitchW = Math.sin(t * 0.42 + phase * 1.3) * profile.pitch * 0.35 * swayMult;
-    const rollW = Math.sin(t * 0.5 + phase * 0.7) * profile.roll * 0.3 * swayMult;
+    const yawW = Math.sin(t * 0.35 + phase) * profile.yaw * 0.4 * swayMult;
+    const pitchW = Math.sin(t * 0.42 + phase * 1.3) * profile.pitch * 0.4 * swayMult;
+    const rollW = Math.sin(t * 0.5 + phase * 0.7) * profile.roll * 0.35 * swayMult;
 
     raw.position.y = bob;
     raw.rotation.x = pose[0] + pitchW;
@@ -451,5 +544,9 @@ export function makeAliveUpdater(raw, speciesId, alive) {
       u.uAmp.value = bAmp * ampMult;
       u.uFreq.value = bFreq * freqMult;
     }
-  };
+  }
+
+  up.setMode = setMode;
+  up.getMode = getMode;
+  return { up, setMode, getMode };
 }
