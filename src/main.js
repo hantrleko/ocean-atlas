@@ -386,8 +386,8 @@ function loop() {
   cam.setViewOffset(w, h, -offX, 0, w, h);
   cam.position.set(0, 0.6 + rotX * 2.5, dist); cam.lookAt(0, -0.1, 0);
   flightsStep(dt);
-  flights.forEach(f => f.o.up(t));
-  if (cur && !flights.some(f => f.o === cur)) cur.up(t);
+  flights.forEach(f => f.o.up(t, dt));
+  if (cur && !flights.some(f => f.o === cur)) cur.up(t, dt);
   pm.uniforms.t.value = t;
   $('#dot').style.transform = `translate(${Math.sin(rotY) * 10}px,${-Math.cos(rotY) * 10}px)`;
   composer.render();
