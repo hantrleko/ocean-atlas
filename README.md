@@ -10,4 +10,6 @@ npm run dev      # 本地预览
 npm run build    # 输出 dist/
 ```
 
-`vite.config.js` 已设置 `base: './'`，构建结果可直接作为 GitHub Pages 项目站点的根目录。Pages 从 `gh-pages` 分支的 `/` 发布。
+`vite.config.js` 已设置 `base: './'`，构建结果可直接作为 GitHub Pages 项目站点的根目录。预构建站点在 `gh-pages` 分支根目录（`index.html`、`assets/`、`models/*.glb`、`.nojekyll`）。
+
+仓库管理员打开 [Settings → Pages](https://github.com/hantrleko/ocean-atlas/settings/pages)，Source 选 **Deploy from a branch**，分支 **gh-pages**，目录 **/ (root)**，保存。保存后 https://hantrleko.github.io/ocean-atlas/ 才会开始发布。
