@@ -2,6 +2,8 @@
 
 博物馆式的海洋生物 3D 图鉴。用 Vite + Three.js 在浏览器里旋转、缩放并阅读十一种物种（小飞象章鱼、鮟鱇鱼、吸血鬼乌贼、桶眼鱼、宽咽鱼、鹦鹉螺、海月水母、僧帽水母、座头鲸、绿海龟、无沟双髻鲨）。网格模型在 `public/models/*.glb`。
 
+静态 GLB 在运行时叠加程序化活体运动（`src/aliveMotion.js`）：按物种做顶点起伏，并带有起伏、偏航和姿态循环。
+
 线上站点：https://hantrleko.github.io/ocean-atlas/
 
 ```bash
