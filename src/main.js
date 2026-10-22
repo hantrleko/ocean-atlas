@@ -396,6 +396,25 @@ $('#nav')?.addEventListener('click', () => { if (isMobile()) closeNav(); });
 $('#featGo')?.addEventListener('click', () => { if (isMobile()) closeNav(); });
 
 let holdView = 0, viewDist = 0, lookY = 0, aimY = 0, camY = 0, frameY = 0;
+/**
+ * Phones: the free stage is the strip between the species carousel and the behaviour tabs, not the
+ * whole canvas. Centre the scene in that strip (view-offset) and pull back so a ~3.4-unit creature
+ * fits inside it. Recomputed from live DOM rects (sheet open/close, rotation) and applied unsmoothed
+ * so the very first frame is already framed.
+ */
+const mobFrame = { y: 0, d: 0, at: -1 };
+function measureMobileStage() {
+  if (!body.classList.contains('mobile')) { mobFrame.y = 0; mobFrame.d = 0; return; }
+  const h = innerHeight;
+  const top = ($('#carousel')?.getBoundingClientRect().bottom || 0) + 6;
+  const tabs = $('#actions')?.getBoundingClientRect();
+  const bot = (tabs && tabs.height ? tabs.top : h * 0.55) - 8;
+  const sh = Math.max(120, bot - top);
+  mobFrame.y = h / 2 - (top + bot) / 2;
+  const ext = 2 * Math.tan(THREE.MathUtils.degToRad(cam.fov / 2));   // world height per unit distance
+  const need = 3.4 / (ext * (sh / h));
+  mobFrame.d = Math.max(0, need - 9);
+}
 let last = performance.now(), T0 = last; let fr = 0; const tmp = new THREE.Vector3();
 function loop() {
   const now = performance.now(), dt = Math.min((now - last) / 1000, 0.05), t = (now - T0) / 1000;
@@ -416,12 +435,13 @@ function loop() {
   camY += (wantCam - camY) * 0.05;
   const wantFrame = (vw && vw.frameY) || 0;
   frameY += (wantFrame - frameY) * 0.06;
+  if (fr - mobFrame.at > 20 || mobFrame.at < 0) { measureMobileStage(); mobFrame.at = fr; }
   stage.rotation.set(rotX * 0.5, rotY, 0);
   dist += (tDist - dist) * 0.08;
   const w = innerWidth, h = innerHeight, target = imm || w < 900 ? 0 : (270 - 378) / 2;
   offX += (target - offX) * 0.08;
-  cam.setViewOffset(w, h, -offX, frameY, w, h);
-  cam.position.set(0, 0.6 + rotX * 2.5 + camY, dist + viewDist); cam.lookAt(0, -0.1 + aimY, 0);
+  cam.setViewOffset(w, h, -offX, frameY + mobFrame.y, w, h);
+  cam.position.set(0, 0.6 + rotX * 2.5 + camY, dist + viewDist + mobFrame.d); cam.lookAt(0, -0.1 + aimY, 0);
   flightsStep(dt);
   flights.forEach(f => f.o.up(t, dt));
   if (cur && !flights.some(f => f.o === cur)) cur.up(t, dt);

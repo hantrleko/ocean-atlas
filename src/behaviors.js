@@ -48,7 +48,7 @@ export const BEHAVIORS = {
   ],
   gulper: [
     { id: 'swim', label: '蛇形游动', hold: 6, pose: [0, 0, 0], amp: 1.6, freq: 1.3, bob: 1, sway: 1.4, fx: { type: 'sweep', period: 4, mag: 0.35 } },
-    { id: 'gape', label: '张口吞网', hold: 5, pose: [-0.15, 0, 0], amp: 0.7, freq: 0.8, bob: 0.6, sway: 0.6, fx: { type: 'gape', period: 2.8, mag: 0.35 } },
+    { id: 'gape', label: '张口吞网', hold: 5, view: { yaw: -0.9, pitch: 0.12, dist: 0.6 }, pose: [-0.15, 0, 0], amp: 0.7, freq: 0.8, bob: 0.6, sway: 0.6, fx: { type: 'gape', period: 2.8, mag: 0.35 } },
     { id: 'tailglow', label: '尾灯诱饵', hold: 6, pose: [0.1, 0, 0.2], amp: 0.6, freq: 0.6, bob: 0.4, sway: 0.4, fx: { type: 'curl', period: 3.5, mag: 0.6 } },
     { id: 'drift', label: '垂直悬垂', hold: 6, pose: [1.25, 0, 0], amp: 0.5, freq: 0.5, bob: 0.6, sway: 0.4, fx: { type: 'sink', period: 7, mag: 0.12 } },
   ],

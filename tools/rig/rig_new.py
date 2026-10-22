@@ -92,6 +92,8 @@ def clip(arm, name, secs, fn, L):
             r = R[pb.name]
             pb.rotation_quaternion = r.inverted() @ q @ r
             pb.keyframe_insert('rotation_quaternion', frame=f+1)
+            pb.scale = Vector(pose.get('_s', {}).get(pb.name, (1, 1, 1)))
+            pb.keyframe_insert('scale', frame=f+1)
             if pb.name == 'root':
                 pb.location = r.inverted() @ (Vector(pose.get('_loc', (0,0,0)))*L)
                 pb.keyframe_insert('location', frame=f+1)
@@ -132,28 +134,39 @@ def hammer_clips():
         d['pec_L'] = [(X, 0.08*S(u, 2))]; d['pec_R'] = [(X, -0.08*S(u, 2))]
         return d
     def scan(u):
-        d = hwave(u, 0.55, 2)
-        d['head'] = [(Y, 0.12), (Z, 0.45*S(u, 2))]            # metal-detector sweep of the cephalofoil
-        d['spine1'] = [(Z, -0.12*S(u, 2, -.05))]
-        d['root'] = [(Y, 0.35)]; d['_loc'] = (0, 0, -0.08)     # nose down toward the seabed
-        d['pec_L'] = [(X, 0.2)]; d['pec_R'] = [(X, -0.2)]
+        # slow, low cruise just above the seabed; cephalofoil sweeps wide side-to-side like a metal detector
+        d = hwave(u, 0.45, 2, 0.1)
+        sweep = S(u, 2)
+        d['head'] = [(Y, 0.22), (Z, 0.62*sweep)]
+        d['spine1'] = [(Z, -0.22*S(u, 2, -.06))]
+        d['spine2'] = [(Z, -0.08*S(u, 2, -.12)), (Y, -0.05)]
+        d['root'] = [(Y, 0.12), (Z, 0.06*S(u, 1))]
+        d['_loc'] = (0.0, 0.05*S(u, 1), -0.2)
+        d['pec_L'] = [(X, 0.3)]; d['pec_R'] = [(X, -0.3)]
         return d
     def pin(u):
-        j = sum(bump(u, a, a+.16) for a in (.15, .45, .72))  # three head slams
-        d = hwave(u, 0.8, 4)
-        d['head'] = [(Y, 0.55*j + 0.1)]
-        d['spine1'] = [(Y, 0.2*j)]
-        d['spine3'] = [(Y, -0.18*j), (Z, 0.12*S(u, 4, -.2))]
-        d['tail'] = [(Y, -0.25*j), (Z, 0.4*S(u, 4, -.4))]
-        d['root'] = [(Y, 0.25 + 0.15*j)]; d['_loc'] = (0.04*j, 0, -0.05 - 0.07*j)
-        d['pec_L'] = [(X, 0.35*j)]; d['pec_R'] = [(X, -0.35*j)]
+        # fast dive -> hard downward head slam with arched body -> held pin (struggle wiggle) -> recover
+        dive = ramp(u, .04, .2)*(1-ramp(u, .74, .95))
+        slam = bump(u, .2, .32)
+        held = hold(u, .24, .32, .64, .8)
+        beat = (1 - 0.75*held)*dive
+        d = {b: [(Z, beat*a*S(u, 6, -i*.12))] for i, (b, a) in enumerate(zip(HSP, [0.04, 0.05, 0.16, 0.28, 0.42, 0.55]))}
+        d['head'] = [(Y, 0.55*slam + 0.5*held), (Z, 0.07*held*S(u, 8))]
+        d['spine1'] = [(Y, 0.18*held + 0.1*slam)]
+        d['spine2'] += [(Y, -0.12*held)]
+        d['spine3'] += [(Y, -0.22*held)]
+        d['spine4'] += [(Y, -0.26*held)]
+        d['tail'] += [(Y, -0.2*held)]
+        d['root'] = [(Y, 0.6*dive)]
+        d['_loc'] = (0.14*dive, 0, -0.26*dive + 0.05*slam)
+        d['pec_L'] = [(X, 0.45*held + 0.15*dive)]; d['pec_R'] = [(X, -0.45*held - 0.15*dive)]
         return d
     def sideswim(u):
         d = hwave(u, 0.85, 2)
         d['root'] = [(X, 1.0 + 0.06*S(u, 1))]; d['_loc'] = (0, 0, 0.02*S(u, 2))  # rolled ~60° (energy-saving side swim)
         d['pec_L'] = [(X, 0.1*S(u, 2))]; d['pec_R'] = [(X, -0.1*S(u, 2))]
         return d
-    return {'patrol': (2.5, patrol), 'scan': (3, scan), 'pin': (3, pin), 'sideswim': (2.5, sideswim)}
+    return {'patrol': (2.5, patrol), 'scan': (5, scan), 'pin': (3.2, pin), 'sideswim': (2.5, sideswim)}
 
 # ======================= GULPER: head +X, curved body in XY, up +Z =====================
 def build_gulper(eb, P, c):
@@ -184,31 +197,35 @@ def build_gulper(eb, P, c):
     add_bone(eb, 'jaw', (snout[0]-0.14*L, snout[1], mz-0.02*L), (snout[0]-0.01*L, snout[1], mz-0.07*L), parent='head')
     return L, names, (snout[0]-0.14*L, mz)
 
-def gulper_clips(names):
+def gulper_clips(names, hd=Vector((1, 0, 0))):
     n = len(names)
     def chain(u, amp, k=1, lag=0.09, ax=Z, grow=1.0):
         return {b: [(ax, amp*(0.25+0.75*(i/(n-1))**grow)*S(u, k, -i*lag))] for i, b in enumerate(names)}
     def swim(u):
         d = chain(u, 0.32, 1, 0.1)
-        d['head'] = [(Z, 0.12*S(u, 1, .1))]; d['jaw'] = [('lat', -0.08)]
+        d['head'] = [(Z, 0.12*S(u, 1, .1))]; d['jaw'] = [('lat', 0.28)]
         d['root'] = [(Z, 0.08*S(u, 1, .05))]; d['_loc'] = (0, 0, 0.02*S(u, 2))
         return d
     def gape(u):
-        o = hold(u, .1, .35, .6, .85)
-        d = chain(u, 0.1, 1)
-        d['jaw'] = [('lat', -0.75*o)]                  # lower jaw drops (rot about lateral)
-        d['head'] = [('lat', 0.3*o)]                  # skull lifts
-        d['root'] = [('lat', 0.12*o)]; d['_loc'] = (0.05*o, 0, 0)
+        c = hold(u, .04, .16, .26, .34)        # snap shut first (contrast)
+        o = hold(u, .32, .48, .74, .92)        # then gape far wider than rest + inflate the pouch
+        d = chain(u, 0.08, 1)
+        d['jaw'] = [('lat', 0.3*c - 1.15*o)]
+        d['head'] = [('lat', 0.38*o - 0.04*c)]
+        d['_s'] = {'jaw': (1 + 0.55*o, 1 + 0.12*o, 1 + 0.55*o), 'head': (1 + 0.12*o, 1, 1 + 0.12*o)}
+        d['root'] = [('lat', 0.1*o)]
+        sv = hd*(0.1*o - 0.03*c)                 # surge forward along the head direction
+        d['_loc'] = (sv.x, sv.y, sv.z)
         return d
     def tailglow(u):
         d = {b: [(Z, -0.22*ramp(i/(n-1), .45, 1) - 0.12*(i/(n-1))**2*S(u, 2, -i*.06)), ('lat', -0.25*(i/(n-1))**2*(0.6+0.4*S(u, 1)))] for i, b in enumerate(names)}
-        d['head'] = [(Z, 0.05*S(u))]; d['jaw'] = [('lat', -0.15)]
+        d['head'] = [(Z, 0.05*S(u))]; d['jaw'] = [('lat', 0.22)]
         d['root'] = [(X, 0.25)]
         return d
     def drift(u):
         d = chain(u, 0.06, 1, 0.12)
         d['root'] = [('lat', -1.25 + 0.04*S(u))]; d['_loc'] = (0, 0, 0.03*S(u))
-        d['head'] = [('lat', -0.08)]; d['jaw'] = [('lat', -0.25 - 0.1*S(u))]
+        d['head'] = [('lat', -0.08)]; d['jaw'] = [('lat', 0.18 - 0.08*S(u))]
         return d
     return {'swim': (3, swim), 'gape': (3, gape), 'tailglow': (3.5, tailglow), 'drift': (6, drift)}
 
@@ -247,7 +264,7 @@ def build_vampire(eb, P, c):
             nm = f'arm{k}_{i}'; add_bone(eb, nm, pts[i], pts[i+1], parent=prev, connect=i > 0); prev = nm
         arms.append((k, len(pts)-1, Vector((col[0].x-ctr[0], col[0].y-ctr[1], 0)).normalized()))
     print("vampire arms", [(k, n) for k, n, _ in arms])
-    return H, arms
+    return H, arms, bands[0]
 
 def vampire_clips(arms):
     def armpose(d, u, spread, wav, k=1, curl=0.0):
@@ -268,10 +285,14 @@ def vampire_clips(arms):
         d['root'] = [(X, 0.25)]; d['_loc'] = (0, 0, -0.08*ramp(u, 0, .5) + 0.08*ramp(u, .5, 1))
         return d
     def cloak(u):
-        o = hold(u, .1, .38, .65, .92)               # pineapple posture: arms flip up over the mantle
-        d = armpose({}, u, 1.25*o + 0.1, 0.05*(1-o), 1, 0.45*o)
-        d['mantle'] = [(X, -0.15*o)]; d['fin_L'] = [(Y, -0.3*o)]; d['fin_R'] = [(Y, 0.3*o)]
-        d['_loc'] = (0, 0, -0.18*o)
+        # pineapple posture: every arm swings up past horizontal and curls back over the mantle so the
+        # webbing turns inside-out around the body (spiny oral side outward), held, then unfurls
+        o = hold(u, .08, .36, .66, .92)
+        d = armpose({}, u, 2.45*o + 0.1, 0.03*(1-o) + 0.02*o, 1, 0.42*o)
+        d['mantle'] = [(Z, 0.15*o*S(u, 1))]
+        d['fin_L'] = [(Y, -0.35*o)]; d['fin_R'] = [(Y, 0.35*o)]
+        d['root'] = [(X, 0.12*o*S(u, 2))]
+        d['_loc'] = (0, 0, -0.22*o)
         return d
     def flee(u):
         p = (u*3) % 1; c = bump(p, 0, .35); e = ramp(p, .3, .9)   # 3 jet pulses
@@ -293,7 +314,7 @@ def run(sp):
     elif sp == 'gulper':
         Lr, names, hinge = build_gulper(eb, P, c)
     else:
-        Lr, arms = build_vampire(eb, P, c)
+        Lr, arms, zj = build_vampire(eb, P, c)
     bpy.ops.object.mode_set(mode='OBJECT')
     ov = None; rad = {}
     if sp == 'gulper':
@@ -306,13 +327,22 @@ def run(sp):
             return W
         rad = {'head': 1.3}
     if sp == 'hammer': rad = {'head': 1.4, 'pec_L': 0.6, 'pec_R': 0.6}
-    if sp == 'vampire': rad = {'mantle': 1.5, 'fin_L': 0.8, 'fin_R': 0.8, 'root': 0.8}
+    if sp == 'vampire':
+        rad = {'mantle': 1.5, 'fin_L': 0.8, 'fin_R': 0.8, 'root': 0.8}
+        def ov(P, W, names_):
+            # clean arm/cloak junction: mantle+fins fade out below the arm root ring, arm bones fade out above
+            W = W.copy(); t = np.clip((P[:, 2] - (zj - 0.06*Lr))/(0.12*Lr), 0, 1)
+            for j, nm in enumerate(names_):
+                if nm in ('mantle', 'fin_L', 'fin_R'): W[:, j] *= 0.03 + 0.97*t
+                elif nm.startswith('arm'): W[:, j] *= 0.03 + 0.97*(1 - t) if not nm.endswith('_0') else 1.0
+            return W
     weights(mesh, arm, power=3.0, radius=rad, overrides=ov)
     L = max(mesh.dimensions)
-    clips = hammer_clips() if sp == 'hammer' else gulper_clips(names) if sp == 'gulper' else vampire_clips(arms)
+    hd = (arm.data.bones['head'].tail_local - arm.data.bones['head'].head_local).normalized() if sp == 'gulper' else None
+    clips = hammer_clips() if sp == 'hammer' else gulper_clips(names, hd) if sp == 'gulper' else vampire_clips(arms)
     bpy.context.view_layer.objects.active = arm
     for nm, (secs, fn) in clips.items(): clip(arm, nm, secs, fn, L)
-    for pb in arm.pose.bones: pb.rotation_quaternion = (1, 0, 0, 0); pb.location = (0, 0, 0)
+    for pb in arm.pose.bones: pb.rotation_quaternion = (1, 0, 0, 0); pb.location = (0, 0, 0); pb.scale = (1, 1, 1)
     save_blend(f"/workspace/ocean-atlas-rig/blend/{sp}_v3.blend")
     out = f"/workspace/ocean-atlas-rig/out3/{sp}.glb"; export_glb(out, use_draco=False)
     print("WROTE", out, os.path.getsize(out))
