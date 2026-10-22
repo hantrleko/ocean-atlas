@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { DRACOLoader, DRACO_GLTF_CONFIG } from 'three/addons/loaders/DRACOLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { applyAliveMotion, makeAliveUpdater } from './aliveMotion.js';
 import { behaviorsFor } from './behaviors.js';
@@ -174,17 +174,60 @@ export function build(id) { const r = B[id](); const box = new THREE.Box3().setF
 export const GLB_IDS = new Set(['vampire','nautilus','dumbo','angler','barreleye','gulper','jelly','physalia','whale','turtle','hammer']);
 
 /** Skinned + AnimationMixer GLBs (skip GPU aliveMotion to avoid double deform). */
-export const RIGGED_IDS = new Set(['angler', 'whale', 'turtle', 'dumbo']);
+export const RIGGED_IDS = new Set(['angler', 'whale', 'turtle', 'dumbo', 'vampire', 'gulper', 'hammer']);
 
 const _tv = new THREE.Vector3();
 const FADE_SEC = 0.3;
 
 const gltfLoader = new GLTFLoader();
 const dracoLoader = new DRACOLoader();
-dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
+// Self-hosted glTF Draco decoder (wasm + wrapper) bundled by Vite via import.meta.url —
+// served from our own assets/ so it is base-path safe under /ocean-atlas/ and needs no CDN.
+dracoLoader.setDecoderPath(DRACO_GLTF_CONFIG);
+dracoLoader.preload();
 gltfLoader.setDRACOLoader(dracoLoader);
 /** Cached { scene, animations } — we clone per display so fly-out can dispose safely. */
 const glbCache = new Map();
+/** In-flight GLB fetch/parse promises so a prefetch and a real select share one download. */
+const glbPending = new Map();
+
+/**
+ * Fetch + parse a species GLB once. onProgress(fraction 0..1) is called while downloading.
+ * Uses Content-Length when available, otherwise an estimate from MODEL_BYTES.
+ */
+function fetchTemplate(id, onProgress) {
+  if (glbCache.has(id)) { onProgress?.(1); return Promise.resolve(glbCache.get(id)); }
+  let p = glbPending.get(id);
+  const listeners = p?.listeners || new Set();
+  if (onProgress) listeners.add(onProgress);
+  if (p) return p;
+  const url = `${import.meta.env.BASE_URL}models/${id}.glb`;
+  p = gltfLoader.loadAsync(url, ev => {
+    const total = ev.lengthComputable && ev.total ? ev.total : (MODEL_BYTES[id] || 6e5);
+    const f = Math.min(0.98, ev.loaded / total);
+    listeners.forEach(fn => fn(f));
+  }).then(gltf => {
+    const t = { scene: gltf.scene, animations: gltf.animations || [] };
+    glbCache.set(id, t); glbPending.delete(id);
+    listeners.forEach(fn => fn(1));
+    return t;
+  }, err => { glbPending.delete(id); throw err; });
+  p.listeners = listeners;
+  glbPending.set(id, p);
+  return p;
+}
+
+/** Approximate compressed sizes (bytes) — progress fallback when the server omits Content-Length. */
+const MODEL_BYTES = { angler: 466e3, barreleye: 296e3, dumbo: 541e3, gulper: 563e3, hammer: 373e3, jelly: 250e3, nautilus: 445e3, physalia: 312e3, turtle: 607e3, vampire: 711e3, whale: 480e3 };
+
+/** Warm the cache for a species in the background (no-op on Save-Data / slow connections). */
+export function prefetchCreature(id) {
+  if (!GLB_IDS.has(id) || glbCache.has(id) || glbPending.has(id)) return;
+  const c = navigator.connection;
+  if (c && (c.saveData || /2g/.test(c.effectiveType || ''))) return;
+  fetchTemplate(id).catch(() => {});
+}
+export const isCached = id => !GLB_IDS.has(id) || glbCache.has(id);
 
 function wrapModel(raw, targetSize, fromGlb) {
   const box = new THREE.Box3().setFromObject(raw);
@@ -213,6 +256,71 @@ function wrapModel(raw, targetSize, fromGlb) {
     }
   });
   return { outer, k };
+}
+
+/**
+ * Gulper texture is near-black: lift it with a texture-driven teal emissive + a fresnel rim so the
+ * silhouette reads on the dark background without losing the deep-sea look (theme-scaled via glowMats).
+ */
+function brightenDeepSea(root) {
+  root.traverse(o => {
+    if (!o.isMesh || !o.material) return;
+    const m = o.material;
+    m.color?.multiplyScalar(1.6);
+    if (m.map) { m.emissiveMap = m.map; }
+    m.emissive?.set(0x4fb6c8);
+    m.emissiveIntensity = 0.55; m.userData.base = 0.55; glowMats.push(m);
+    m.onBeforeCompile = sh => {
+      sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+        float rim = pow(1.0 - clamp(abs(dot(normalize(vNormal), normalize(vViewPosition))), 0.0, 1.0), 2.5);
+        totalEmissiveRadiance += vec3(0.25, 0.75, 0.9) * rim * 0.55;`);
+    };
+    m.customProgramCacheKey = () => 'gulper-rim';
+    m.needsUpdate = true;
+  });
+}
+
+/**
+ * Motion envelope of a wrapped creature, in the wrapper's local frame: a point cloud of sampled vertices
+ * across ALL of its clips (rigged) or across every behaviour's rigid pose/fx motion (static GLBs, driven
+ * through their own updater). main.js fits the phone camera to these points exactly.
+ * Returns { pts: Float32Array xyz, pad } (pad = extra fraction for GPU-only displacement).
+ */
+const _bv = new THREE.Vector3();
+function sampleInto(outer, raw, out, per) {
+  outer.updateMatrixWorld(true);
+  raw.traverse(o => {
+    if (!o.isMesh || !o.geometry?.attributes?.position) return;
+    const n = o.geometry.attributes.position.count, step = Math.max(1, Math.floor(n / per));
+    for (let i = 0; i < n; i += step) {
+      o.getVertexPosition(i, _bv); _bv.applyMatrix4(o.matrixWorld); out.push(_bv.x, _bv.y, _bv.z);
+    }
+  });
+}
+function measureFitRigged(outer, raw, clips) {
+  const out = [], m = new THREE.AnimationMixer(raw);
+  for (const c of clips) {
+    const a = m.clipAction(c); a.play();
+    for (let k = 0; k < 8; k++) { m.setTime(c.duration * k / 8); sampleInto(outer, raw, out, 500); }
+    a.stop();
+  }
+  m.stopAllAction(); m.uncacheRoot(raw);
+  return { pts: new Float32Array(out), pad: 0.03 };
+}
+function measureFitStatic(outer, raw, id, ctrl) {
+  const out = [];
+  const list = behaviorsFor(id);
+  const save = [outer.position.clone(), outer.quaternion.clone()];
+  let t = 1000;
+  for (const b of list) {
+    ctrl.setMode(b.id);
+    const dur = Math.max(4, (b.fx?.period || 3) * 1.5);
+    for (let k = 0; k < 40; k++) { t += dur / 40; ctrl.up(t, dur / 40); if (k % 3 === 2) sampleInto(outer, raw, out, 350); }
+  }
+  ctrl.setMode('auto'); ctrl.up(t + 0.016, 0.016);
+  outer.position.copy(save[0]); outer.quaternion.copy(save[1]);
+  // static models also get GPU-only undulation (tentacles/fins) that the CPU can't see: small pad
+  return { pts: new Float32Array(out), pad: 0.08 };
 }
 
 function cloneMaterials(root) {
@@ -317,26 +425,23 @@ function makeRiggedUpdater(raw, outer, id, mixer, clips) {
  * falls back to procedural build() if missing or load fails.
  * Returns { g, raw, up, setMode, getMode, k, mixer? } matching build().
  */
-export async function loadCreature(id) {
+export async function loadCreature(id, onProgress) {
   if (!GLB_IDS.has(id)) return build(id);
   try {
-    let template = glbCache.get(id);
-    if (!template) {
-      const url = `${import.meta.env.BASE_URL}models/${id}.glb`;
-      const gltf = await gltfLoader.loadAsync(url);
-      template = { scene: gltf.scene, animations: gltf.animations || [] };
-      glbCache.set(id, template);
-    }
+    const template = await fetchTemplate(id, onProgress);
     const useRig = RIGGED_IDS.has(id) && template.animations.length > 0;
     const raw = useRig ? SkeletonUtils.clone(template.scene) : template.scene.clone(true);
     cloneMaterials(raw);
 
     if (useRig) {
       const { outer, k } = wrapModel(raw, 2.8, true);
+      if (id === 'gulper') brightenDeepSea(raw);
       const mixer = new THREE.AnimationMixer(raw);
       const clips = Object.fromEntries(template.animations.map(a => [a.name, a]));
+      const fit = measureFitRigged(outer, raw, template.animations);
       const ctrl = makeRiggedUpdater(raw, outer, id, mixer, clips);
       return {
+        fit,
         g: outer, raw, up: ctrl.up, setMode: ctrl.setMode, getMode: ctrl.getMode, k, mixer, view: ctrl.view, trackY: ctrl.trackY,
       };
     }
@@ -345,7 +450,8 @@ export async function loadCreature(id) {
     const alive = applyAliveMotion(raw, id);
     const { outer, k } = wrapModel(raw, 2.8, true);
     const ctrl = makeAliveUpdater(raw, id, alive);
-    return { g: outer, raw, up: ctrl.up, setMode: ctrl.setMode, getMode: ctrl.getMode, k };
+    const fit = measureFitStatic(outer, raw, id, ctrl);
+    return { fit, g: outer, raw, up: ctrl.up, setMode: ctrl.setMode, getMode: ctrl.getMode, k };
   } catch (err) {
     console.warn(`[ocean-atlas] GLB load failed for ${id}, using procedural:`, err?.message || err);
     return build(id);

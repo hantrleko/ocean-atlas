@@ -4,7 +4,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { SPECIES } from './species.js';
-import { build, glowMats, loadCreature } from './creatures.js';
+import { build, glowMats, loadCreature, prefetchCreature, isCached } from './creatures.js';
 import { uniqueBehaviors, behaviorLabel } from './aliveMotion.js';
 
 const $ = s => document.querySelector(s), body = document.body;
@@ -160,12 +160,17 @@ async function select(i, instant) {
   applyTheme();
   vY = instant ? 0 : 0.05;
   let n;
+  // Loading overlay: only appears if the model isn't cached and takes >120 ms
+  const cached = isCached(s.id);
+  const showT = cached ? 0 : setTimeout(() => loader.show(s.name), 120);
   try {
-    n = await loadCreature(s.id);
+    n = await loadCreature(s.id, f => { if (token === loadToken) loader.set(f); });
   } catch (err) {
     console.warn('loadCreature failed, procedural fallback', err);
     n = build(s.id);
   }
+  clearTimeout(showT);
+  if (token === loadToken) loader.hide();
   if (token !== loadToken) {
     // superseded — drop unused group
     n.g.traverse(o => { if (!n.g.userData.fromGlb) o.geometry?.dispose(); });
@@ -177,7 +182,23 @@ async function select(i, instant) {
   flights.push({ o: n, t: instant ? 1 : 0, out: false });
   cur = n;
   applyActionMode();
+  // Warm the next species in the background once the current one is on stage
+  const nextId = SPECIES[(i + 1) % SPECIES.length].id;
+  const idle = window.requestIdleCallback || (fn => setTimeout(fn, 1200));
+  setTimeout(() => idle(() => { if (token === loadToken) prefetchCreature(nextId); }), 1500);
 }
+
+/** Model-load progress overlay (#loader). */
+const loader = (() => {
+  const el = document.getElementById('loader');
+  const bar = el.querySelector('.bar i'), pct = el.querySelector('.pct'), name = el.querySelector('.nm');
+  let shown = false;
+  return {
+    show(nm) { shown = true; name.textContent = nm; this.set(0); el.classList.add('on'); el.setAttribute('aria-hidden', 'false'); },
+    set(f) { const v = Math.round(Math.max(0, Math.min(1, f)) * 100); bar.style.transform = `scaleX(${v / 100})`; pct.textContent = v + '%'; el.setAttribute('aria-valuenow', v); },
+    hide() { if (!shown) return; shown = false; this.set(1); setTimeout(() => { el.classList.remove('on'); el.setAttribute('aria-hidden', 'true'); }, 180); },
+  };
+})();
 
 const ease = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
 
@@ -375,6 +396,48 @@ $('#nav')?.addEventListener('click', () => { if (isMobile()) closeNav(); });
 $('#featGo')?.addEventListener('click', () => { if (isMobile()) closeNav(); });
 
 let holdView = 0, viewDist = 0, lookY = 0, aimY = 0, camY = 0, frameY = 0;
+/**
+ * Phones: the free stage is the strip between the species carousel and the behaviour tabs, not the
+ * whole canvas. Centre the scene in that strip (view-offset) and pull back so a ~3.4-unit creature
+ * fits inside it. Recomputed from live DOM rects (sheet open/close, rotation) and applied unsmoothed
+ * so the very first frame is already framed.
+ */
+const mobFrame = { y: 0, d: 0, cy: 0, at: -1, cur: null, key: '' };
+function measureMobileStage() {
+  if (!body.classList.contains('mobile')) { mobFrame.y = 0; mobFrame.d = 0; mobFrame.cy = 0; return; }
+  const w = innerWidth, h = innerHeight;
+  const top = ($('#carousel')?.getBoundingClientRect().bottom || 0) + 10;
+  const tabs = $('#actions')?.getBoundingClientRect();
+  const bot = (tabs && tabs.height ? tabs.top : h * 0.55) - 10;
+  const sh = Math.max(120, bot - top), sw = w - 2 * 12;            // stage strip with small side margins
+  const key = [cur?.s?.id, w, h, Math.round(sh)].join();
+  mobFrame.y = h / 2 - (top + bot) / 2;
+  if (key === mobFrame.key) return;
+  mobFrame.key = key;
+  const f = cur?.fit;
+  if (!f?.pts?.length) { mobFrame.d = 0; mobFrame.cy = 0; return; }
+  // Exact fit of the motion envelope: the stage spins freely about Y, so test every yaw. For a point
+  // (x,y,z) seen from distance D on +Z: |x|/(D-z) <= tanH and |y-cy|/(D-z) <= tanV  =>  D >= z + max(..)
+  const tanHalf = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2));
+  const tanV = tanHalf * (sh / h) * 0.94, tanH = tanHalf * cam.aspect * (sw / w) * 0.94;
+  const P = f.pts, pad = 1 + (f.pad || 0);
+  let y0 = Infinity, y1 = -Infinity;
+  for (let i = 1; i < P.length; i += 3) { y0 = Math.min(y0, P[i]); y1 = Math.max(y1, P[i]); }
+  const cy = (y0 + y1) / 2;
+  let D = 0;
+  const YAWS = 16;
+  for (let a = 0; a < YAWS; a++) {
+    const c = Math.cos(a / YAWS * Math.PI * 2), sn = Math.sin(a / YAWS * Math.PI * 2);
+    for (let i = 0; i < P.length; i += 3) {
+      const x = (P[i] * c + P[i + 2] * sn) * pad, z = (-P[i] * sn + P[i + 2] * c) * pad, y = (P[i + 1] - cy) * pad;
+      const need = z + Math.max(Math.abs(x) / tanH, Math.abs(y) / tanV);
+      if (need > D) D = need;
+    }
+  }
+  mobFrame.d = D - 9;                     // relative to the default camera distance (can zoom in)
+  mobFrame.cy = cy;
+}
+if (new URLSearchParams(location.search).has('debug')) window.__oa = {};
 let last = performance.now(), T0 = last; let fr = 0; const tmp = new THREE.Vector3();
 function loop() {
   const now = performance.now(), dt = Math.min((now - last) / 1000, 0.05), t = (now - T0) / 1000;
@@ -384,8 +447,9 @@ function loop() {
   if (drag) holdView = now + 2500;
   const steer = vw && now > holdView;
   if (!drag) { vY *= 0.94; rotY += vY + (steer && vw.yaw != null ? 0 : dt * 0.08); }
-  if (steer && vw.yaw != null) { const tgt = vw.yaw + Math.PI * 2 * Math.round((rotY - vw.yaw) / (Math.PI * 2)); rotY += (tgt - rotY) * 0.04; }
+  if (steer && vw.yaw != null) { const tgt = vw.yaw + Math.PI * 2 * Math.round((rotY - vw.yaw) / (Math.PI * 2)); rotY += (tgt - rotY) * (1 - Math.exp(-dt * (vw.yawK || 2.4))); }  // frame-rate independent
   if (steer && vw.pitch != null) rotX += (vw.pitch - rotX) * 0.04;
+  if (window.__oa) { window.__oa.rotY = rotY; window.__oa.steer = !!(steer && vw.yaw != null); if (window.__oa.setYaw != null) { rotY = window.__oa.setYaw; vY = 0; } }
   const mob = innerWidth < 900; // mobile: stage is the upper part of the screen, so pull back more and aim lower
   viewDist += (((vw && (mob && vw.mobDist != null ? vw.mobDist : vw.dist)) || 0) * (mob && vw?.dist > 0 ? 1.6 : 1) - viewDist) * 0.05; const wantY = vw && vw.track && cur.trackY ? cur.trackY() * 0.9 + (mob ? -1.0 : 0) : ((vw && vw.lookY) || 0) * (mob ? -0.6 : 1);
   lookY += (wantY - lookY) * (vw && vw.track ? 0.12 : 0.05);
@@ -395,12 +459,13 @@ function loop() {
   camY += (wantCam - camY) * 0.05;
   const wantFrame = (vw && vw.frameY) || 0;
   frameY += (wantFrame - frameY) * 0.06;
+  if (fr - mobFrame.at > 20 || mobFrame.at < 0 || mobFrame.cur !== cur) { measureMobileStage(); mobFrame.at = fr; mobFrame.cur = cur; }
   stage.rotation.set(rotX * 0.5, rotY, 0);
   dist += (tDist - dist) * 0.08;
   const w = innerWidth, h = innerHeight, target = imm || w < 900 ? 0 : (270 - 378) / 2;
   offX += (target - offX) * 0.08;
-  cam.setViewOffset(w, h, -offX, frameY, w, h);
-  cam.position.set(0, 0.6 + rotX * 2.5 + camY, dist + viewDist); cam.lookAt(0, -0.1 + aimY, 0);
+  cam.setViewOffset(w, h, -offX, frameY + mobFrame.y, w, h);
+  cam.position.set(0, 0.6 + rotX * 2.5 + camY + mobFrame.cy, dist + viewDist + mobFrame.d); cam.lookAt(0, -0.1 + aimY + mobFrame.cy, 0);
   flightsStep(dt);
   flights.forEach(f => f.o.up(t, dt));
   if (cur && !flights.some(f => f.o === cur)) cur.up(t, dt);
