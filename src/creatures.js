@@ -258,6 +258,65 @@ function wrapModel(raw, targetSize, fromGlb) {
   return { outer, k };
 }
 
+/**
+ * Gulper texture is near-black: lift it with a texture-driven teal emissive + a fresnel rim so the
+ * silhouette reads on the dark background without losing the deep-sea look (theme-scaled via glowMats).
+ */
+function brightenDeepSea(root) {
+  root.traverse(o => {
+    if (!o.isMesh || !o.material) return;
+    const m = o.material;
+    m.color?.multiplyScalar(1.6);
+    if (m.map) { m.emissiveMap = m.map; }
+    m.emissive?.set(0x4fb6c8);
+    m.emissiveIntensity = 0.55; m.userData.base = 0.55; glowMats.push(m);
+    m.onBeforeCompile = sh => {
+      sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+        float rim = pow(1.0 - clamp(abs(dot(normalize(vNormal), normalize(vViewPosition))), 0.0, 1.0), 2.5);
+        totalEmissiveRadiance += vec3(0.25, 0.75, 0.9) * rim * 0.55;`);
+    };
+    m.customProgramCacheKey = () => 'gulper-rim';
+    m.needsUpdate = true;
+  });
+}
+
+/**
+ * Bounding extents of a wrapped creature across ALL of its clips (sampled skinned vertices), in the
+ * wrapper's local frame. Used to fit the camera on phones. Static/procedural models: rest box + 15%.
+ * Returns { r: max horizontal radius about the Y axis (stage spins freely), y0, y1 }.
+ */
+const _bv = new THREE.Vector3();
+function measureFit(outer, raw, clips) {
+  const box = new THREE.Box3();
+  let rr = 0;
+  const add = () => {
+    outer.updateMatrixWorld(true);
+    raw.traverse(o => {
+      if (!o.isMesh || !o.geometry?.attributes?.position) return;
+      const n = o.geometry.attributes.position.count, step = Math.max(1, Math.floor(n / 6000));
+      for (let i = 0; i < n; i += step) {
+        o.getVertexPosition(i, _bv); _bv.applyMatrix4(o.matrixWorld);
+        box.expandByPoint(_bv); rr = Math.max(rr, Math.hypot(_bv.x, _bv.z));
+      }
+    });
+  };
+  if (clips && clips.length) {
+    const m = new THREE.AnimationMixer(raw);
+    for (const c of clips) {
+      const a = m.clipAction(c); a.play();
+      for (let k = 0; k < 6; k++) { m.setTime(c.duration * k / 6); add(); }
+      a.stop();
+    }
+    m.stopAllAction(); m.uncacheRoot(raw);
+    return { r: rr * 1.04, y0: box.min.y * 1.04, y1: box.max.y * 1.04 };
+  }
+  add();
+  // static GLBs get rigid poses/fx + GPU undulation at runtime (e.g. jelly reoriented dome-up, pulse scale):
+  // use an orientation-agnostic bounding sphere with 20% headroom instead of the rest box
+  const R = Math.max(rr, Math.abs(box.min.y), Math.abs(box.max.y), box.max.length(), box.min.length()) * 1.2;
+  return { r: R, y0: -R, y1: R };
+}
+
 function cloneMaterials(root) {
   root.traverse(o => {
     if (!o.isMesh || !o.material) return;
@@ -370,10 +429,13 @@ export async function loadCreature(id, onProgress) {
 
     if (useRig) {
       const { outer, k } = wrapModel(raw, 2.8, true);
+      if (id === 'gulper') brightenDeepSea(raw);
       const mixer = new THREE.AnimationMixer(raw);
       const clips = Object.fromEntries(template.animations.map(a => [a.name, a]));
+      const fit = measureFit(outer, raw, template.animations);
       const ctrl = makeRiggedUpdater(raw, outer, id, mixer, clips);
       return {
+        fit,
         g: outer, raw, up: ctrl.up, setMode: ctrl.setMode, getMode: ctrl.getMode, k, mixer, view: ctrl.view, trackY: ctrl.trackY,
       };
     }
@@ -382,7 +444,8 @@ export async function loadCreature(id, onProgress) {
     const alive = applyAliveMotion(raw, id);
     const { outer, k } = wrapModel(raw, 2.8, true);
     const ctrl = makeAliveUpdater(raw, id, alive);
-    return { g: outer, raw, up: ctrl.up, setMode: ctrl.setMode, getMode: ctrl.getMode, k };
+    const fit = measureFit(outer, raw, null);
+    return { fit, g: outer, raw, up: ctrl.up, setMode: ctrl.setMode, getMode: ctrl.getMode, k };
   } catch (err) {
     console.warn(`[ocean-atlas] GLB load failed for ${id}, using procedural:`, err?.message || err);
     return build(id);

@@ -285,14 +285,24 @@ def vampire_clips(arms):
         d['root'] = [(X, 0.25)]; d['_loc'] = (0, 0, -0.08*ramp(u, 0, .5) + 0.08*ramp(u, .5, 1))
         return d
     def cloak(u):
-        # pineapple posture: every arm swings up past horizontal and curls back over the mantle so the
-        # webbing turns inside-out around the body (spiny oral side outward), held, then unfurls
-        o = hold(u, .08, .36, .66, .92)
-        d = armpose({}, u, 2.45*o + 0.1, 0.03*(1-o) + 0.02*o, 1, 0.42*o)
-        d['mantle'] = [(Z, 0.15*o*S(u, 1))]
-        d['fin_L'] = [(Y, -0.35*o)]; d['fin_R'] = [(Y, 0.35*o)]
-        d['root'] = [(X, 0.12*o*S(u, 2))]
-        d['_loc'] = (0, 0, -0.22*o)
+        # inverted "pineapple": each arm everts ~190° up and over the mantle, the rotation spread along
+        # the chain (root joint never exceeds ~85°, which keeps the webbing from shearing), oral side +
+        # cirri end up facing outward; mantle shrinks/tucks inside the arm cage. hold, then unfurl.
+        o = hold(u, .08, .34, .68, .92)
+        seg = [1.45, 1.05, 0.62, 0.22]
+        d = {}
+        for (a, n, rd) in arms:
+            tang = Z.cross(rd).normalized()
+            for i in range(n):
+                # distal segments curl first, the root joint lifts last -> no flat 'sheet' mid-swing
+                k = 3 - min(i, 3)
+                oi = hold(u, .06 + 0.05*k, .28 + 0.03*k, .68 - 0.03*k, .92)
+                d[f'arm{a}_{i}'] = [(tang, -(seg[min(i, 3)]*oi + 0.03*(1-o)*S(u, 1, -i*.12 + a*.07) + 0.1*(i == 0)*(1-o)))]
+        d['_s'] = {'mantle': (1 - 0.22*o, 1 - 0.3*o, 1 - 0.22*o), 'fin_L': (1 - 0.5*o,)*3, 'fin_R': (1 - 0.5*o,)*3}
+        d['mantle'] = [(Z, 0.1*o*S(u, 1))]
+        d['fin_L'] = [(Y, -0.5*o)]; d['fin_R'] = [(Y, 0.5*o)]
+        d['root'] = [(X, 0.06*o*S(u, 2))]
+        d['_loc'] = (0, 0, -0.12*o)
         return d
     def flee(u):
         p = (u*3) % 1; c = bump(p, 0, .35); e = ramp(p, .3, .9)   # 3 jet pulses
@@ -331,10 +341,11 @@ def run(sp):
         rad = {'mantle': 1.5, 'fin_L': 0.8, 'fin_R': 0.8, 'root': 0.8}
         def ov(P, W, names_):
             # clean arm/cloak junction: mantle+fins fade out below the arm root ring, arm bones fade out above
-            W = W.copy(); t = np.clip((P[:, 2] - (zj - 0.06*Lr))/(0.12*Lr), 0, 1)
+            W = W.copy(); t = np.clip((P[:, 2] - (zj - 0.1*Lr))/(0.16*Lr), 0, 1)
+            t = t*t*(3 - 2*t)
             for j, nm in enumerate(names_):
                 if nm in ('mantle', 'fin_L', 'fin_R'): W[:, j] *= 0.03 + 0.97*t
-                elif nm.startswith('arm'): W[:, j] *= 0.03 + 0.97*(1 - t) if not nm.endswith('_0') else 1.0
+                elif nm.startswith('arm'): W[:, j] *= (0.03 + 0.97*(1 - t)) if not nm.endswith('_0') else (1.6 - 0.6*t)
             return W
     weights(mesh, arm, power=3.0, radius=rad, overrides=ov)
     L = max(mesh.dimensions)
