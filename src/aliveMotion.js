@@ -40,7 +40,7 @@ export const MOTION = {
     behaviors: null,
   },
   jelly: {
-    kind: 'jelly', undulate: 0.08, freq: 1.4, bob: 0.12, yaw: 0.1, pitch: 0.02, roll: 0.03,
+    kind: 'jelly', undulate: 0.22, freq: 1.55, bob: 0.1, yaw: 0.05, pitch: 0.0, roll: 0.02,
     behaviors: null,
   },
   physalia: {
@@ -193,7 +193,7 @@ const VERTEX_CHUNK = /* glsl */ `
       d += uUpDir * (w2 + sin(uTime * uFreq * 1.1 + along) * uAmp * 0.4);
       d += uLenDir * sin(uTime * uFreq * 0.6 + latN * 2.0) * uAmp * 0.25;
     } else if (uKind < 2.5) {
-      // jelly — radial / vertical bell pulse
+      // jelly — radial / vertical bell pulse + lagging tentacle stretch
       float pulse = sin(uTime * uFreq);
       float bell = smoothstep(-0.2, 1.0, upN);
       float radial = pulse * uAmp * (0.55 + 0.45 * bell);
@@ -201,7 +201,12 @@ const VERTEX_CHUNK = /* glsl */ `
       d += radialDir * (radial / max(halfLat, 1e-4));
       d -= uUpDir * pulse * uAmp * 0.55 * (0.4 + 0.6 * bell);
       float below = smoothstep(0.15, -1.0, upN);
-      d += uLatDir * sin(uTime * uFreq * 1.2 + along * 3.0) * uAmp * 0.5 * below;
+      // Tentacles stretch downward on the power stroke and sway with a phase lag
+      float lagPulse = sin(uTime * uFreq - 0.85);
+      d -= uUpDir * lagPulse * uAmp * 2.4 * below;
+      d += uLatDir * sin(uTime * uFreq * 1.35 + along * 3.2 - 0.6) * uAmp * 1.4 * below;
+      d += uLenDir * sin(uTime * uFreq * 0.9 + latN * 2.0) * uAmp * 0.9 * below;
+      d += radialDir * lagPulse * uAmp * 0.6 * below;
     } else if (uKind < 3.5) {
       // tendril / physalia — more motion on lower parts
       float below = smoothstep(0.2, -1.0, upN);
@@ -309,7 +314,13 @@ export function applyAliveMotion(root, speciesId) {
     const size = bb.getSize(new THREE.Vector3());
     const center = bb.getCenter(new THREE.Vector3());
     const half = size.clone().multiplyScalar(0.5);
-    const { lengthAxis, lateralAxis, upAxis } = axesFromSize(size);
+    let { lengthAxis, lateralAxis, upAxis } = axesFromSize(size);
+    // Jelly is roughly spherical; force Y = dome-up so tentacles (below) stretch correctly
+    if (speciesId === 'jelly') {
+      upAxis = 1;
+      lengthAxis = size.x >= size.z ? 0 : 2;
+      lateralAxis = lengthAxis === 0 ? 2 : 0;
+    }
     const halfLen = half.getComponent(lengthAxis);
     const uniforms = makeUniforms(profile, center, half, lengthAxis, lateralAxis, upAxis, sharedTime);
     const meshAmp = ampForMesh(profile, halfLen);

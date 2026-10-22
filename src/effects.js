@@ -73,24 +73,69 @@ export function makeSpout(raw, outer) {
       for (let i = 0; i < pa.count; i++) { const z = pa.getZ(i), f = (bb.max.z - z) / len; if (f > 0.22 && f < 0.32 && Math.abs(pa.getX(i)) < len * 0.05 && pa.getY(i) > best) { best = pa.getY(i); bi = i; } }
     }
     const dt = lastT == null ? 0.016 : Math.min(0.05, Math.max(0, t - lastT)); lastT = t;
-    const emit = behaviorId === 'blow' && phase > 0.32 && phase < 0.62;
+    // Drop the whale during the blow so the spout has headroom (base y; bob is added after)
+    if (behaviorId === 'blow') outer.position.y = -1.25;
+    const emit = behaviorId === 'blow' && phase > 0.28 && phase < 0.7;
     if (emit) {
       _v.fromBufferAttribute(pa, bi); skinned.applyBoneTransform(bi, _v); skinned.localToWorld(_v); outer.worldToLocal(_v);
-      for (let n = 0; n < 6; n++) {
+      _v.y -= 0.05;
+      for (let n = 0; n < 4; n++) {
         const i = i0; i0 = (i0 + 1) % N; life[i] = 0;
         pos[i * 3] = _v.x; pos[i * 3 + 1] = _v.y; pos[i * 3 + 2] = _v.z;
-        const r = Math.random() * 0.35, th = Math.random() * Math.PI * 2;
-        vel[i * 3] = Math.cos(th) * r; vel[i * 3 + 1] = 2.2 + Math.random() * 1.4; vel[i * 3 + 2] = Math.sin(th) * r;
+        const r = Math.random() * 0.18, th = Math.random() * Math.PI * 2;
+        // Short column in outer-local +Y so mist stays near the head and in frame
+        vel[i * 3] = Math.cos(th) * r * 0.7; vel[i * 3 + 1] = 0.28 + Math.random() * 0.12; vel[i * 3 + 2] = Math.sin(th) * r * 0.7;
       }
     }
     for (let i = 0; i < N; i++) {
       if (life[i] < 0) { a[i] = 0; continue; }
-      life[i] += dt; const L = life[i] / 1.6;
+      life[i] += dt; const L = life[i] / 0.65;
       if (L >= 1) { life[i] = -1; a[i] = 0; continue; }
-      vel[i * 3 + 1] -= dt * 1.2; vel[i * 3] *= 1 + dt * 0.6; vel[i * 3 + 2] *= 1 + dt * 0.6;
+      vel[i * 3 + 1] -= dt * 1.6; vel[i * 3] *= 1 + dt * 0.4; vel[i * 3 + 2] *= 1 + dt * 0.4;
       pos[i * 3] += vel[i * 3] * dt; pos[i * 3 + 1] += vel[i * 3 + 1] * dt; pos[i * 3 + 2] += vel[i * 3 + 2] * dt;
-      a[i] = 0.55 * (1 - L) * Math.min(1, L * 8); sz[i] = 0.25 + L * 0.9;
+      // Cap height relative to the blowhole so mist never runs off the top of the frame
+      if (bi >= 0) {
+        _v.fromBufferAttribute(pa, bi); skinned.applyBoneTransform(bi, _v); skinned.localToWorld(_v); outer.worldToLocal(_v);
+        if (pos[i * 3 + 1] > _v.y + 0.22) pos[i * 3 + 1] = _v.y + 0.22;
+      }
+      a[i] = 0.6 * (1 - L) * Math.min(1, L * 10); sz[i] = 0.2 + L * 0.7;
     }
     geo.attributes.position.needsUpdate = geo.attributes.alpha.needsUpdate = geo.attributes.size.needsUpdate = true;
   };
 }
+
+
+/** Dark oral cavity: a radial-gradient disc in the gape so the open mouth reads as a deep throat. */
+export function makeMouthCavity(raw) {
+  const head = raw.getObjectByName('spine1');
+  if (!head) return null;
+  const g = new THREE.Group(); head.add(g);
+  const cv = document.createElement('canvas'); cv.width = cv.height = 256;
+  const x = cv.getContext('2d');
+  const grd = x.createRadialGradient(128, 128, 8, 128, 128, 128);
+  grd.addColorStop(0, 'rgb(0,0,0)');
+  grd.addColorStop(0.35, 'rgb(8,2,4)');
+  grd.addColorStop(0.7, 'rgb(28,10,12)');
+  grd.addColorStop(1, 'rgb(40,18,16)');
+  x.fillStyle = grd; x.fillRect(0, 0, 256, 256);
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+  const mat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide, depthWrite: true });
+  // Disc in the XY plane of the bone, facing ±Y (snout axis); rotate so it faces the snout
+  const disc = new THREE.Mesh(new THREE.CircleGeometry(1, 32), mat);
+  disc.rotation.x = Math.PI / 2; // face along ±Y
+  g.add(disc);
+  // Slightly smaller, darker disc pushed further into the throat for parallax
+  const deep = new THREE.Mesh(new THREE.CircleGeometry(0.7, 24), new THREE.MeshBasicMaterial({
+    color: 0x000000, side: THREE.DoubleSide,
+  }));
+  deep.rotation.x = Math.PI / 2; deep.position.set(0, 0.12, 0); g.add(deep);
+  let ready = false;
+  return function update(_t, behaviorId) {
+    if (!ready) { g.position.set(0, -0.13, -0.02); g.scale.setScalar(0.18); ready = true; }
+    const open = behaviorId === 'strike' ? 1 : behaviorId === 'lure' ? 0.55 : behaviorId === 'ambush' ? 0.28 : 0.1;
+    g.visible = open > 0.1;
+    g.scale.setScalar(0.15 + 0.06 * open);
+  };
+}
+
+

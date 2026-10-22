@@ -374,7 +374,7 @@ sheetHandle?.addEventListener('click', () => {
 $('#nav')?.addEventListener('click', () => { if (isMobile()) closeNav(); });
 $('#featGo')?.addEventListener('click', () => { if (isMobile()) closeNav(); });
 
-let holdView = 0, viewDist = 0, lookY = 0;
+let holdView = 0, viewDist = 0, lookY = 0, aimY = 0, camY = 0, frameY = 0;
 let last = performance.now(), T0 = last; let fr = 0; const tmp = new THREE.Vector3();
 function loop() {
   const now = performance.now(), dt = Math.min((now - last) / 1000, 0.05), t = (now - T0) / 1000;
@@ -389,12 +389,18 @@ function loop() {
   const mob = innerWidth < 900; // mobile: stage is the upper part of the screen, so pull back more and aim lower
   viewDist += (((vw && (mob && vw.mobDist != null ? vw.mobDist : vw.dist)) || 0) * (mob && vw?.dist > 0 ? 1.6 : 1) - viewDist) * 0.05; const wantY = vw && vw.track && cur.trackY ? cur.trackY() * 0.9 + (mob ? -1.0 : 0) : ((vw && vw.lookY) || 0) * (mob ? -0.6 : 1);
   lookY += (wantY - lookY) * (vw && vw.track ? 0.12 : 0.05);
+  const wantAim = (vw && vw.aimY != null) ? vw.aimY : lookY;
+  const wantCam = (vw && vw.camY != null) ? vw.camY : lookY;
+  aimY += (wantAim - aimY) * 0.05;
+  camY += (wantCam - camY) * 0.05;
+  const wantFrame = (vw && vw.frameY) || 0;
+  frameY += (wantFrame - frameY) * 0.06;
   stage.rotation.set(rotX * 0.5, rotY, 0);
   dist += (tDist - dist) * 0.08;
   const w = innerWidth, h = innerHeight, target = imm || w < 900 ? 0 : (270 - 378) / 2;
   offX += (target - offX) * 0.08;
-  cam.setViewOffset(w, h, -offX, 0, w, h);
-  cam.position.set(0, 0.6 + rotX * 2.5 + lookY, dist + viewDist); cam.lookAt(0, -0.1 + lookY, 0);
+  cam.setViewOffset(w, h, -offX, frameY, w, h);
+  cam.position.set(0, 0.6 + rotX * 2.5 + camY, dist + viewDist); cam.lookAt(0, -0.1 + aimY, 0);
   flightsStep(dt);
   flights.forEach(f => f.o.up(t, dt));
   if (cur && !flights.some(f => f.o === cur)) cur.up(t, dt);
