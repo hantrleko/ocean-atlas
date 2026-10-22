@@ -281,40 +281,46 @@ function brightenDeepSea(root) {
 }
 
 /**
- * Bounding extents of a wrapped creature across ALL of its clips (sampled skinned vertices), in the
- * wrapper's local frame. Used to fit the camera on phones. Static/procedural models: rest box + 15%.
- * Returns { r: max horizontal radius about the Y axis (stage spins freely), y0, y1 }.
+ * Motion envelope of a wrapped creature, in the wrapper's local frame: a point cloud of sampled vertices
+ * across ALL of its clips (rigged) or across every behaviour's rigid pose/fx motion (static GLBs, driven
+ * through their own updater). main.js fits the phone camera to these points exactly.
+ * Returns { pts: Float32Array xyz, pad } (pad = extra fraction for GPU-only displacement).
  */
 const _bv = new THREE.Vector3();
-function measureFit(outer, raw, clips) {
-  const box = new THREE.Box3();
-  let rr = 0;
-  const add = () => {
-    outer.updateMatrixWorld(true);
-    raw.traverse(o => {
-      if (!o.isMesh || !o.geometry?.attributes?.position) return;
-      const n = o.geometry.attributes.position.count, step = Math.max(1, Math.floor(n / 6000));
-      for (let i = 0; i < n; i += step) {
-        o.getVertexPosition(i, _bv); _bv.applyMatrix4(o.matrixWorld);
-        box.expandByPoint(_bv); rr = Math.max(rr, Math.hypot(_bv.x, _bv.z));
-      }
-    });
-  };
-  if (clips && clips.length) {
-    const m = new THREE.AnimationMixer(raw);
-    for (const c of clips) {
-      const a = m.clipAction(c); a.play();
-      for (let k = 0; k < 6; k++) { m.setTime(c.duration * k / 6); add(); }
-      a.stop();
+function sampleInto(outer, raw, out, per) {
+  outer.updateMatrixWorld(true);
+  raw.traverse(o => {
+    if (!o.isMesh || !o.geometry?.attributes?.position) return;
+    const n = o.geometry.attributes.position.count, step = Math.max(1, Math.floor(n / per));
+    for (let i = 0; i < n; i += step) {
+      o.getVertexPosition(i, _bv); _bv.applyMatrix4(o.matrixWorld); out.push(_bv.x, _bv.y, _bv.z);
     }
-    m.stopAllAction(); m.uncacheRoot(raw);
-    return { r: rr * 1.04, y0: box.min.y * 1.04, y1: box.max.y * 1.04 };
+  });
+}
+function measureFitRigged(outer, raw, clips) {
+  const out = [], m = new THREE.AnimationMixer(raw);
+  for (const c of clips) {
+    const a = m.clipAction(c); a.play();
+    for (let k = 0; k < 8; k++) { m.setTime(c.duration * k / 8); sampleInto(outer, raw, out, 500); }
+    a.stop();
   }
-  add();
-  // static GLBs get rigid poses/fx + GPU undulation at runtime (e.g. jelly reoriented dome-up, pulse scale):
-  // use an orientation-agnostic bounding sphere with 20% headroom instead of the rest box
-  const R = Math.max(rr, Math.abs(box.min.y), Math.abs(box.max.y), box.max.length(), box.min.length()) * 1.2;
-  return { r: R, y0: -R, y1: R };
+  m.stopAllAction(); m.uncacheRoot(raw);
+  return { pts: new Float32Array(out), pad: 0.03 };
+}
+function measureFitStatic(outer, raw, id, ctrl) {
+  const out = [];
+  const list = behaviorsFor(id);
+  const save = [outer.position.clone(), outer.quaternion.clone()];
+  let t = 1000;
+  for (const b of list) {
+    ctrl.setMode(b.id);
+    const dur = Math.max(4, (b.fx?.period || 3) * 1.5);
+    for (let k = 0; k < 40; k++) { t += dur / 40; ctrl.up(t, dur / 40); if (k % 3 === 2) sampleInto(outer, raw, out, 350); }
+  }
+  ctrl.setMode('auto'); ctrl.up(t + 0.016, 0.016);
+  outer.position.copy(save[0]); outer.quaternion.copy(save[1]);
+  // static models also get GPU-only undulation (tentacles/fins) that the CPU can't see: small pad
+  return { pts: new Float32Array(out), pad: 0.08 };
 }
 
 function cloneMaterials(root) {
@@ -432,7 +438,7 @@ export async function loadCreature(id, onProgress) {
       if (id === 'gulper') brightenDeepSea(raw);
       const mixer = new THREE.AnimationMixer(raw);
       const clips = Object.fromEntries(template.animations.map(a => [a.name, a]));
-      const fit = measureFit(outer, raw, template.animations);
+      const fit = measureFitRigged(outer, raw, template.animations);
       const ctrl = makeRiggedUpdater(raw, outer, id, mixer, clips);
       return {
         fit,
@@ -444,7 +450,7 @@ export async function loadCreature(id, onProgress) {
     const alive = applyAliveMotion(raw, id);
     const { outer, k } = wrapModel(raw, 2.8, true);
     const ctrl = makeAliveUpdater(raw, id, alive);
-    const fit = measureFit(outer, raw, null);
+    const fit = measureFitStatic(outer, raw, id, ctrl);
     return { fit, g: outer, raw, up: ctrl.up, setMode: ctrl.setMode, getMode: ctrl.getMode, k };
   } catch (err) {
     console.warn(`[ocean-atlas] GLB load failed for ${id}, using procedural:`, err?.message || err);

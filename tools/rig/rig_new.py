@@ -262,18 +262,52 @@ def build_vampire(eb, P, c):
         prev = 'root'
         for i in range(len(pts)-1):
             nm = f'arm{k}_{i}'; add_bone(eb, nm, pts[i], pts[i+1], parent=prev, connect=i > 0); prev = nm
-        arms.append((k, len(pts)-1, Vector((col[0].x-ctr[0], col[0].y-ctr[1], 0)).normalized()))
-    print("vampire arms", [(k, n) for k, n, _ in arms])
+        arms.append((k, len(pts)-1, Vector((col[0].x-ctr[0], col[0].y-ctr[1], 0)).normalized(), pts))
+    print("vampire arms", [(k, n) for k, n, _, _ in arms])
+    # ---- webbing: one bone chain on the bisector between every pair of neighbouring arms (incl. the gap
+    #      left by an undetected arm), at the arms' mean radius/height per level, so the web follows the arms
+    C0 = Vector((ctr[0], ctr[1], 0))
+    srt = sorted(arms, key=lambda t: math.atan2(t[2].y, t[2].x))
+    webs = []
+    for j in range(len(srt)):
+        A, B = srt[j], srt[(j+1) % len(srt)]
+        aa, ab = math.atan2(A[2].y, A[2].x), math.atan2(B[2].y, B[2].x)
+        if ab <= aa: ab += TAU
+        am = (aa+ab)/2; rd = Vector((math.cos(am), math.sin(am), 0))
+        n = min(A[1], B[1], 3)
+        pts = []
+        for i in range(n+1):
+            pa, pb = A[3][i], B[3][i]
+            ra = (Vector((pa.x, pa.y, 0))-C0).length; rb = (Vector((pb.x, pb.y, 0))-C0).length
+            r = (ra+rb)/2*(0.92 if i else 1.0); z = (pa.z+pb.z)/2
+            pts.append(C0 + rd*r + Vector((0, 0, z)))
+        prev = 'root'
+        for i in range(n):
+            nm = f'web{j}_{i}'; add_bone(eb, nm, pts[i], pts[i+1], parent=prev, connect=i > 0); prev = nm
+        webs.append((j, n, rd, A[0], B[0]))
+    print("vampire webs", [(j, n, a, b) for j, n, _, a, b in webs])
+    arms = (arms, webs)
     return H, arms, bands[0]
 
-def vampire_clips(arms):
-    def armpose(d, u, spread, wav, k=1, curl=0.0):
-        for (a, n, rd) in arms:
-            tang = Z.cross(rd).normalized()          # rotating about tangent swings the arm outward (+) / inward (-)
+def vampire_clips(arms_webs):
+    arms, webs = arms_webs
+    def emit(d, ang):
+        """ang[(arm, seg)] -> rotation (outward/up +) ; webs take the mean of their two neighbour arms"""
+        for (a, n, rd, _) in arms:
+            tang = Z.cross(rd).normalized()
+            for i in range(n): d[f'arm{a}_{i}'] = [(tang, -ang[(a, i)])]
+        for (j, n, rd, a, b) in webs:
+            tang = Z.cross(rd).normalized()
             for i in range(n):
-                ang = (spread if i == 0 else curl) + wav*S(u, k, -i*.12 + a*.07)
-                d[f'arm{a}_{i}'] = [(tang, -ang)]
+                v = 0.5*(ang.get((a, i), 0) + ang.get((b, i), 0))
+                d[f'web{j}_{i}'] = [(tang, -v)]
         return d
+    def armpose(d, u, spread, wav, k=1, curl=0.0):
+        ang = {}
+        for (a, n, rd, _) in arms:
+            for i in range(n):
+                ang[(a, i)] = (spread if i == 0 else curl) + wav*S(u, k, -i*.12 + a*.07)
+        return emit(d, ang)
     def drift(u):
         d = armpose({}, u, 0.12, 0.08, 1)
         d['fin_L'] = [(Y, 0.55*S(u, 2))]; d['fin_R'] = [(Y, -0.55*S(u, 2))]
@@ -285,23 +319,19 @@ def vampire_clips(arms):
         d['root'] = [(X, 0.25)]; d['_loc'] = (0, 0, -0.08*ramp(u, 0, .5) + 0.08*ramp(u, .5, 1))
         return d
     def cloak(u):
-        # inverted "pineapple": each arm everts ~190° up and over the mantle, the rotation spread along
-        # the chain (root joint never exceeds ~85°, which keeps the webbing from shearing), oral side +
-        # cirri end up facing outward; mantle shrinks/tucks inside the arm cage. hold, then unfurl.
+        # inverted "pineapple": arms AND web chains evert together (~190 deg spread along each chain, distal
+        # segments first), so the web turns inside-out as one skirt; mantle/fins shrink and tuck inside
         o = hold(u, .08, .34, .68, .92)
         seg = [1.45, 1.05, 0.62, 0.22]
-        d = {}
-        for (a, n, rd) in arms:
-            tang = Z.cross(rd).normalized()
+        ang = {}
+        for (a, n, rd, _) in arms:
             for i in range(n):
-                # distal segments curl first, the root joint lifts last -> no flat 'sheet' mid-swing
                 k = 3 - min(i, 3)
                 oi = hold(u, .06 + 0.05*k, .28 + 0.03*k, .68 - 0.03*k, .92)
-                d[f'arm{a}_{i}'] = [(tang, -(seg[min(i, 3)]*oi + 0.03*(1-o)*S(u, 1, -i*.12 + a*.07) + 0.1*(i == 0)*(1-o)))]
-        d['_s'] = {'mantle': (1 - 0.22*o, 1 - 0.3*o, 1 - 0.22*o), 'fin_L': (1 - 0.5*o,)*3, 'fin_R': (1 - 0.5*o,)*3}
-        d['mantle'] = [(Z, 0.1*o*S(u, 1))]
+                ang[(a, i)] = seg[min(i, 3)]*oi + 0.1*(i == 0)*(1-o)
+        d = emit({}, ang)
+        d['_s'] = {'mantle': (1 - 0.22*o, 1 - 0.3*o, 1 - 0.22*o), 'fin_L': (1 - 0.6*o,)*3, 'fin_R': (1 - 0.6*o,)*3}
         d['fin_L'] = [(Y, -0.5*o)]; d['fin_R'] = [(Y, 0.5*o)]
-        d['root'] = [(X, 0.06*o*S(u, 2))]
         d['_loc'] = (0, 0, -0.12*o)
         return d
     def flee(u):
@@ -338,14 +368,14 @@ def run(sp):
         rad = {'head': 1.3}
     if sp == 'hammer': rad = {'head': 1.4, 'pec_L': 0.6, 'pec_R': 0.6}
     if sp == 'vampire':
-        rad = {'mantle': 1.5, 'fin_L': 0.8, 'fin_R': 0.8, 'root': 0.8}
+        rad = {'mantle': 1.5, 'fin_L': 0.8, 'fin_R': 0.8, 'root': 0.8, **{f'web{j}_{i}': 0.85 for j in range(12) for i in range(4)}}
         def ov(P, W, names_):
             # clean arm/cloak junction: mantle+fins fade out below the arm root ring, arm bones fade out above
             W = W.copy(); t = np.clip((P[:, 2] - (zj - 0.1*Lr))/(0.16*Lr), 0, 1)
             t = t*t*(3 - 2*t)
             for j, nm in enumerate(names_):
                 if nm in ('mantle', 'fin_L', 'fin_R'): W[:, j] *= 0.03 + 0.97*t
-                elif nm.startswith('arm'): W[:, j] *= (0.03 + 0.97*(1 - t)) if not nm.endswith('_0') else (1.6 - 0.6*t)
+                elif nm.startswith('arm') or nm.startswith('web'): W[:, j] *= (0.03 + 0.97*(1 - t)) if not nm.endswith('_0') else (1.6 - 0.6*t)
             return W
     weights(mesh, arm, power=3.0, radius=rad, overrides=ov)
     L = max(mesh.dimensions)

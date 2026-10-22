@@ -402,25 +402,40 @@ let holdView = 0, viewDist = 0, lookY = 0, aimY = 0, camY = 0, frameY = 0;
  * fits inside it. Recomputed from live DOM rects (sheet open/close, rotation) and applied unsmoothed
  * so the very first frame is already framed.
  */
-const mobFrame = { y: 0, d: 0, cy: 0, at: -1, cur: null };
+const mobFrame = { y: 0, d: 0, cy: 0, at: -1, cur: null, key: '' };
 function measureMobileStage() {
   if (!body.classList.contains('mobile')) { mobFrame.y = 0; mobFrame.d = 0; mobFrame.cy = 0; return; }
   const w = innerWidth, h = innerHeight;
-  const top = ($('#carousel')?.getBoundingClientRect().bottom || 0) + 8;
+  const top = ($('#carousel')?.getBoundingClientRect().bottom || 0) + 10;
   const tabs = $('#actions')?.getBoundingClientRect();
   const bot = (tabs && tabs.height ? tabs.top : h * 0.55) - 10;
-  const sh = Math.max(120, bot - top), sw = w - 2 * 14;            // stage strip with side margins
+  const sh = Math.max(120, bot - top), sw = w - 2 * 12;            // stage strip with small side margins
+  const key = [cur?.s?.id, w, h, Math.round(sh)].join();
   mobFrame.y = h / 2 - (top + bot) / 2;
-  // bounding-box fit across every clip of the current creature (cur.fit), with ~12% margin
-  const f = cur?.fit || { r: 1.7, y0: -1.4, y1: 1.4 };
-  const k = cur?.g ? cur.g.scale.x || 1 : 1;
-  const H = (f.y1 - f.y0) * Math.max(k, 1), W = 2 * f.r * Math.max(k, 1);
-  const ext = 2 * Math.tan(THREE.MathUtils.degToRad(cam.fov / 2));  // visible height per unit distance
-  const needH = H / (ext * 0.88 * (sh / h));
-  const needW = W / (ext * cam.aspect * 0.88 * (sw / w));
-  const need = Math.max(needH, needW) + f.r * 0.6;                   // near side of the creature is closer
-  mobFrame.d = Math.max(0, need - 9);
-  mobFrame.cy = (f.y0 + f.y1) / 2;
+  if (key === mobFrame.key) return;
+  mobFrame.key = key;
+  const f = cur?.fit;
+  if (!f?.pts?.length) { mobFrame.d = 0; mobFrame.cy = 0; return; }
+  // Exact fit of the motion envelope: the stage spins freely about Y, so test every yaw. For a point
+  // (x,y,z) seen from distance D on +Z: |x|/(D-z) <= tanH and |y-cy|/(D-z) <= tanV  =>  D >= z + max(..)
+  const tanHalf = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2));
+  const tanV = tanHalf * (sh / h) * 0.94, tanH = tanHalf * cam.aspect * (sw / w) * 0.94;
+  const P = f.pts, pad = 1 + (f.pad || 0);
+  let y0 = Infinity, y1 = -Infinity;
+  for (let i = 1; i < P.length; i += 3) { y0 = Math.min(y0, P[i]); y1 = Math.max(y1, P[i]); }
+  const cy = (y0 + y1) / 2;
+  let D = 0;
+  const YAWS = 16;
+  for (let a = 0; a < YAWS; a++) {
+    const c = Math.cos(a / YAWS * Math.PI * 2), sn = Math.sin(a / YAWS * Math.PI * 2);
+    for (let i = 0; i < P.length; i += 3) {
+      const x = (P[i] * c + P[i + 2] * sn) * pad, z = (-P[i] * sn + P[i + 2] * c) * pad, y = (P[i + 1] - cy) * pad;
+      const need = z + Math.max(Math.abs(x) / tanH, Math.abs(y) / tanV);
+      if (need > D) D = need;
+    }
+  }
+  mobFrame.d = D - 9;                     // relative to the default camera distance (can zoom in)
+  mobFrame.cy = cy;
 }
 if (new URLSearchParams(location.search).has('debug')) window.__oa = {};
 let last = performance.now(), T0 = last; let fr = 0; const tmp = new THREE.Vector3();
