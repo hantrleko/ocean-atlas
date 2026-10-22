@@ -374,17 +374,26 @@ sheetHandle?.addEventListener('click', () => {
 $('#nav')?.addEventListener('click', () => { if (isMobile()) closeNav(); });
 $('#featGo')?.addEventListener('click', () => { if (isMobile()) closeNav(); });
 
+let holdView = 0, viewDist = 0, lookY = 0;
 let last = performance.now(), T0 = last; let fr = 0; const tmp = new THREE.Vector3();
 function loop() {
   const now = performance.now(), dt = Math.min((now - last) / 1000, 0.05), t = (now - T0) / 1000;
   last = now; fr++;
-  if (!drag) { vY *= 0.94; rotY += vY + dt * 0.08; }
+  // per-behaviour camera hint (e.g. angler front-3/4 for the jaw, whale pull-back for breach)
+  const vw = cur && !flights.some(f => f.o === cur) ? cur.view?.() : null;
+  if (drag) holdView = now + 2500;
+  const steer = vw && now > holdView;
+  if (!drag) { vY *= 0.94; rotY += vY + (steer && vw.yaw != null ? 0 : dt * 0.08); }
+  if (steer && vw.yaw != null) { const tgt = vw.yaw + Math.PI * 2 * Math.round((rotY - vw.yaw) / (Math.PI * 2)); rotY += (tgt - rotY) * 0.04; }
+  if (steer && vw.pitch != null) rotX += (vw.pitch - rotX) * 0.04;
+  const mob = innerWidth < 900; // mobile: stage is the upper part of the screen, so pull back more and aim lower
+  viewDist += (((vw && vw.dist) || 0) * (mob && vw?.dist > 0 ? 1.6 : 1) - viewDist) * 0.05; lookY += (((vw && vw.lookY) || 0) * (mob ? -0.6 : 1) - lookY) * 0.05;
   stage.rotation.set(rotX * 0.5, rotY, 0);
   dist += (tDist - dist) * 0.08;
   const w = innerWidth, h = innerHeight, target = imm || w < 900 ? 0 : (270 - 378) / 2;
   offX += (target - offX) * 0.08;
   cam.setViewOffset(w, h, -offX, 0, w, h);
-  cam.position.set(0, 0.6 + rotX * 2.5, dist); cam.lookAt(0, -0.1, 0);
+  cam.position.set(0, 0.6 + rotX * 2.5 + lookY, dist + viewDist); cam.lookAt(0, -0.1 + lookY, 0);
   flightsStep(dt);
   flights.forEach(f => f.o.up(t, dt));
   if (cur && !flights.some(f => f.o === cur)) cur.up(t, dt);

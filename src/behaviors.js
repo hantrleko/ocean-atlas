@@ -7,14 +7,14 @@
 export const BEHAVIORS = {
   // ---- rigged (Blender clips) ----
   angler: [
-    { id: 'ambush', label: '伏击静候', hold: 6 },
-    { id: 'lure', label: '诱饵摆动', hold: 6 },
-    { id: 'strike', label: '猛扑吞食', hold: 5 },
+    { id: 'ambush', label: '伏击静候', hold: 6, view: { yaw: 0.55, pitch: 0.05, dist: -1.5 } },
+    { id: 'lure', label: '诱饵摆动', hold: 6, view: { yaw: 0.6, pitch: 0.08, dist: -1.5 } },
+    { id: 'strike', label: '猛扑吞食', hold: 5, view: { yaw: 0.5, pitch: 0.02, dist: -1.5 } },
     { id: 'swim', label: '缓慢游动', hold: 5 },
   ],
   whale: [
     { id: 'cruise', label: '巡游', hold: 6 },
-    { id: 'breach', label: '跃身击浪', hold: 4.5 },
+    { id: 'breach', label: '跃身击浪', hold: 4.5, view: { dist: 5, lookY: 0.9 } },
     { id: 'lobtail', label: '拍尾', hold: 6 },
     { id: 'blow', label: '喷气换气', hold: 4 },
     { id: 'song', label: '倒立歌唱', hold: 7 },
@@ -57,9 +57,9 @@ export const BEHAVIORS = {
     { id: 'forage', label: '触手觅食', hold: 6, pose: [0.45, 0, 0], amp: 1.6, freq: 1.3, bob: 0.6, sway: 0.8, fx: { type: 'sweep', period: 3, mag: 0.35 } },
   ],
   jelly: [
-    { id: 'pulse', label: '伞体脉动', hold: 6, pose: [0, 0, 0], amp: 1.2, freq: 1.2, bob: 0.5, sway: 0.6, fx: { type: 'pulse', period: 1.4, mag: 0.22, axis: 'x' } },
+    { id: 'pulse', label: '伞体脉动', hold: 6, pose: [0, 0, 0], amp: 1.2, freq: 1.2, bob: 0.5, sway: 0.6, fx: { type: 'pulse', period: 1.4, mag: 0.22 } },
     { id: 'drift', label: '随流漂浮', hold: 6, pose: [0.2, 0, 0.3], amp: 0.5, freq: 0.5, bob: 1.4, sway: 1.6, fx: { type: 'tumble', period: 9, mag: 0.6 } },
-    { id: 'feed', label: '口腕进食', hold: 6, pose: [-0.35, 0, 0], amp: 1.5, freq: 0.7, bob: 0.6, sway: 0.6, fx: { type: 'pulse', period: 3.2, mag: 0.1, axis: 'x' } },
+    { id: 'feed', label: '口腕进食', hold: 6, pose: [-0.35, 0, 0], amp: 1.5, freq: 0.7, bob: 0.6, sway: 0.6, fx: { type: 'pulse', period: 3.2, mag: 0.1 } },
   ],
   physalia: [
     { id: 'sail', label: '迎风帆行', hold: 6, pose: [0, 0.3, 0.45], amp: 0.8, freq: 1, bob: 0.8, sway: 0.6, fx: { type: 'sail', period: 4, mag: 0.4 } },

@@ -4,6 +4,7 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { applyAliveMotion, makeAliveUpdater } from './aliveMotion.js';
 import { behaviorsFor } from './behaviors.js';
+import { makeLureGlow, makeSpout } from './effects.js';
 const S = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.55, metalness: 0.05, ...o });
 const P = (c, o = {}) => new THREE.MeshPhysicalMaterial({ color: c, roughness: 0.2, transparent: true, opacity: 0.45, clearcoat: 1, depthWrite: false, side: THREE.DoubleSide, ...o });
 export const glowMats = [];
@@ -260,6 +261,10 @@ function makeRiggedUpdater(raw, outer, id, mixer, clips) {
   const list = behaviorsFor(id).filter(b => clips[b.id]);
   let autoIdx = 0, autoT0 = null;
   playClip(clipForBehavior(id, list[0]?.id, clips), 0);
+  const fx = [id === 'angler' && makeLureGlow(raw, outer), id === 'whale' && makeSpout(raw, outer)].filter(Boolean);
+  const activeId = () => (mode === 'auto' ? list[autoIdx]?.id : mode);
+  /** Camera hint for the current behaviour ({yaw, pitch, dist, lookY}) — consumed by main.js. */
+  function view() { return behaviorsFor(id).find(b => b.id === activeId())?.view || null; }
 
   function setMode(m) {
     if (m == null || m === 'auto') {
@@ -291,13 +296,15 @@ function makeRiggedUpdater(raw, outer, id, mixer, clips) {
       }
     }
     mixer.update(d);
+    const ph = currentAction ? (currentAction.time / currentAction.getClip().duration) : 0;
+    for (const f of fx) f(t, activeId(), ph);
     // Subtle rigid bob on wrap group only — no GPU displace on skinned mesh
     if (outer) outer.position.y = Math.sin(t * 0.9) * 0.025;
   }
 
   up.setMode = setMode;
   up.getMode = getMode;
-  return { up, setMode, getMode, mixer };
+  return { up, setMode, getMode, mixer, view };
 }
 
 /**
@@ -325,7 +332,7 @@ export async function loadCreature(id) {
       const clips = Object.fromEntries(template.animations.map(a => [a.name, a]));
       const ctrl = makeRiggedUpdater(raw, outer, id, mixer, clips);
       return {
-        g: outer, raw, up: ctrl.up, setMode: ctrl.setMode, getMode: ctrl.getMode, k, mixer,
+        g: outer, raw, up: ctrl.up, setMode: ctrl.setMode, getMode: ctrl.getMode, k, mixer, view: ctrl.view,
       };
     }
 
