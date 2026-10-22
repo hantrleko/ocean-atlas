@@ -162,11 +162,14 @@ body.imm #actions{opacity:0;transform:translateY(20px);pointer-events:none}
   body.imm #tools{transform:translateY(40px);opacity:0}
 
   #cap{
-    left:12px;right:12px;
+    /* keep clear of the 3 tool buttons on the right (3×40 + 2×8 gap + margins) */
+    left:12px;right:calc(152px + env(safe-area-inset-right,0px));text-align:left;
     bottom:calc(36vh + 8px + env(safe-area-inset-bottom,0px));
   }
+  #cap .deg{justify-content:flex-start}
+  #loader{top:30vh;min-width:0;width:min(300px,78vw)}
   body.sheet-open #cap{bottom:calc(70vh + 8px + env(safe-area-inset-bottom,0px))}
-  #caption{font-size:15px;letter-spacing:.5px}
+  #caption{font-size:15px;letter-spacing:.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .deg{margin-top:6px;font-size:10px;letter-spacing:1px}
   .ring{width:20px;height:20px}
   #dot{width:5px;height:5px;margin:-2.5px}
@@ -308,15 +311,17 @@ body.mobile.sheet-open #tools{bottom:calc(70vh + 14px + env(safe-area-inset-bott
 body.mobile.imm #tools{transform:translateY(40px);opacity:0}
 
 body.mobile #cap{
-  left:12px;right:12px;
+  /* keep clear of the 3 tool buttons on the right */
+  left:12px;right:calc(152px + env(safe-area-inset-right,0px));text-align:left;
   bottom:calc(36vh + 8px + env(safe-area-inset-bottom,0px));
 }
 body.mobile.sheet-open #cap{bottom:calc(70vh + 8px + env(safe-area-inset-bottom,0px))}
-body.mobile #caption{font-size:15px;letter-spacing:.5px}
+body.mobile #caption{font-size:15px;letter-spacing:.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 body.mobile .deg{margin-top:6px;font-size:10px;letter-spacing:1px}
 body.mobile .ring{width:20px;height:20px}
 body.mobile #dot{width:5px;height:5px;margin:-2.5px}
 body.mobile.imm #cap{opacity:0;transform:translateY(20px)}
+body.mobile #loader{top:30vh;min-width:0;width:min(300px,78vw)}
 
 body.mobile #right{
   top:auto !important;left:0 !important;right:0 !important;bottom:0 !important;
@@ -378,3 +383,17 @@ body.mobile #actions button{font-size:11px;padding:6px 12px}
 body.mobile.sheet-open #actions{bottom:calc(70vh + 72px + env(safe-area-inset-bottom,0px))}
 body.mobile.imm #actions{opacity:0;pointer-events:none}
 
+
+/* ---- model loading overlay ---- */
+#loader{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%) scale(.96);z-index:30;min-width:240px;padding:14px 16px 12px;border-radius:18px;background:var(--glass);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid var(--line);box-shadow:0 12px 40px rgba(10,20,40,.18);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .25s,transform .25s,visibility 0s linear .25s}
+#loader.on{opacity:1;visibility:visible;transform:translate(-50%,-50%) scale(1);transition-delay:0s}
+#loader .ld{display:flex;align-items:center;gap:12px}
+#loader .ld>div{flex:1;display:flex;flex-direction:column}
+#loader small{font-size:10px;letter-spacing:.12em;color:var(--mute)}
+#loader b{font-size:15px}
+#loader .pct{font-variant-numeric:tabular-nums;font-size:13px;color:var(--acc);min-width:38px;text-align:right}
+#loader .spin{width:20px;height:20px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--acc);animation:ldspin .8s linear infinite}
+#loader .bar{margin-top:10px;height:4px;border-radius:4px;background:var(--line);overflow:hidden}
+#loader .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--acc),#7fd8ff);transform-origin:0 50%;transform:scaleX(0);transition:transform .2s}
+@keyframes ldspin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){#loader .spin{animation:none}}

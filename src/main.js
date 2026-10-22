@@ -4,7 +4,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { SPECIES } from './species.js';
-import { build, glowMats, loadCreature } from './creatures.js';
+import { build, glowMats, loadCreature, prefetchCreature, isCached } from './creatures.js';
 import { uniqueBehaviors, behaviorLabel } from './aliveMotion.js';
 
 const $ = s => document.querySelector(s), body = document.body;
@@ -160,12 +160,17 @@ async function select(i, instant) {
   applyTheme();
   vY = instant ? 0 : 0.05;
   let n;
+  // Loading overlay: only appears if the model isn't cached and takes >120 ms
+  const cached = isCached(s.id);
+  const showT = cached ? 0 : setTimeout(() => loader.show(s.name), 120);
   try {
-    n = await loadCreature(s.id);
+    n = await loadCreature(s.id, f => { if (token === loadToken) loader.set(f); });
   } catch (err) {
     console.warn('loadCreature failed, procedural fallback', err);
     n = build(s.id);
   }
+  clearTimeout(showT);
+  if (token === loadToken) loader.hide();
   if (token !== loadToken) {
     // superseded — drop unused group
     n.g.traverse(o => { if (!n.g.userData.fromGlb) o.geometry?.dispose(); });
@@ -177,7 +182,23 @@ async function select(i, instant) {
   flights.push({ o: n, t: instant ? 1 : 0, out: false });
   cur = n;
   applyActionMode();
+  // Warm the next species in the background once the current one is on stage
+  const nextId = SPECIES[(i + 1) % SPECIES.length].id;
+  const idle = window.requestIdleCallback || (fn => setTimeout(fn, 1200));
+  setTimeout(() => idle(() => { if (token === loadToken) prefetchCreature(nextId); }), 1500);
 }
+
+/** Model-load progress overlay (#loader). */
+const loader = (() => {
+  const el = document.getElementById('loader');
+  const bar = el.querySelector('.bar i'), pct = el.querySelector('.pct'), name = el.querySelector('.nm');
+  let shown = false;
+  return {
+    show(nm) { shown = true; name.textContent = nm; this.set(0); el.classList.add('on'); el.setAttribute('aria-hidden', 'false'); },
+    set(f) { const v = Math.round(Math.max(0, Math.min(1, f)) * 100); bar.style.transform = `scaleX(${v / 100})`; pct.textContent = v + '%'; el.setAttribute('aria-valuenow', v); },
+    hide() { if (!shown) return; shown = false; this.set(1); setTimeout(() => { el.classList.remove('on'); el.setAttribute('aria-hidden', 'true'); }, 180); },
+  };
+})();
 
 const ease = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
 
