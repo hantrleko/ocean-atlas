@@ -3,6 +3,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { applyAliveMotion, makeAliveUpdater } from './aliveMotion.js';
+import { behaviorsFor } from './behaviors.js';
+import { makeLureGlow, makeSpout, makeMouthCavity } from './effects.js';
 const S = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.55, metalness: 0.05, ...o });
 const P = (c, o = {}) => new THREE.MeshPhysicalMaterial({ color: c, roughness: 0.2, transparent: true, opacity: 0.45, clearcoat: 1, depthWrite: false, side: THREE.DoubleSide, ...o });
 export const glowMats = [];
@@ -174,8 +176,7 @@ export const GLB_IDS = new Set(['vampire','nautilus','dumbo','angler','barreleye
 /** Skinned + AnimationMixer GLBs (skip GPU aliveMotion to avoid double deform). */
 export const RIGGED_IDS = new Set(['angler', 'whale', 'turtle', 'dumbo']);
 
-const CLIP_IDLE_BEHAVIORS = new Set(['rest', 'idle', 'display', 'court']);
-const CLIP_LURE_BEHAVIORS = new Set(['hunt', 'lure']);
+const _tv = new THREE.Vector3();
 const FADE_SEC = 0.3;
 
 const gltfLoader = new GLTFLoader();
@@ -222,15 +223,9 @@ function cloneMaterials(root) {
   });
 }
 
-/** Map UI behavior id → AnimationClip for a rigged species. */
+/** Map UI behavior id → AnimationClip (clip names == behavior ids, authored in Blender). */
 function clipForBehavior(id, behaviorId, clips) {
-  if (id === 'angler') {
-    if (CLIP_LURE_BEHAVIORS.has(behaviorId)) return clips.lure || clips.swim;
-    return clips.swim;
-  }
-  // whale / turtle / dumbo
-  if (CLIP_IDLE_BEHAVIORS.has(behaviorId)) return clips.idle || clips.swim;
-  return clips.swim;
+  return clips[behaviorId] || clips[behaviorsFor(id)[0].id] || Object.values(clips)[0];
 }
 
 /**
@@ -263,12 +258,22 @@ function makeRiggedUpdater(raw, outer, id, mixer, clips) {
     currentAction = next;
   }
 
-  playClip(clips.swim, 0);
+  // auto: cycle through this species' own behavior list
+  const list = behaviorsFor(id).filter(b => clips[b.id]);
+  let autoIdx = 0, autoT0 = null;
+  playClip(clipForBehavior(id, list[0]?.id, clips), 0);
+  const fx = [id === 'angler' && makeLureGlow(raw, outer), id === 'angler' && makeMouthCavity(raw), id === 'whale' && makeSpout(raw, outer)].filter(Boolean);
+  const activeId = () => (mode === 'auto' ? list[autoIdx]?.id : mode);
+  /** Camera hint for the current behaviour ({yaw, pitch, dist, lookY}) — consumed by main.js. */
+  const trackBone = raw.getObjectByName(id === 'whale' ? 'spine3' : 'root');
+  /** World-space height of the body centre (for camera tracking during breach). */
+  function trackY() { if (!trackBone) return 0; trackBone.getWorldPosition(_tv); return _tv.y; }
+  function view() { return behaviorsFor(id).find(b => b.id === activeId())?.view || null; }
 
   function setMode(m) {
     if (m == null || m === 'auto') {
-      mode = 'auto';
-      playClip(clips.swim);
+      mode = 'auto'; autoT0 = null;
+      playClip(clipForBehavior(id, list[autoIdx]?.id, clips));
       return 'auto';
     }
     mode = m;
@@ -287,14 +292,24 @@ function makeRiggedUpdater(raw, outer, id, mixer, clips) {
       d = Math.min(Math.max(t - lastT, 0), 0.05);
     }
     lastT = t;
+    if (mode === 'auto' && list.length > 1) {
+      if (autoT0 == null) autoT0 = t;
+      if (t - autoT0 > (list[autoIdx].hold || 5)) {
+        autoIdx = (autoIdx + 1) % list.length; autoT0 = t;
+        playClip(clipForBehavior(id, list[autoIdx].id, clips), 0.6);
+      }
+    }
     mixer.update(d);
-    // Subtle rigid bob on wrap group only — no GPU displace on skinned mesh
-    if (outer) outer.position.y = Math.sin(t * 0.9) * 0.025;
+    const ph = currentAction ? (currentAction.time / currentAction.getClip().duration) : 0;
+    if (outer) outer.position.y = 0;
+    for (const f of fx) f(t, activeId(), ph);
+    // Subtle rigid bob on wrap group only — additive so behaviour fx (e.g. blow drop) can shift the base
+    if (outer) outer.position.y += Math.sin(t * 0.9) * 0.025;
   }
 
   up.setMode = setMode;
   up.getMode = getMode;
-  return { up, setMode, getMode, mixer };
+  return { up, setMode, getMode, mixer, view, trackY };
 }
 
 /**
@@ -322,7 +337,7 @@ export async function loadCreature(id) {
       const clips = Object.fromEntries(template.animations.map(a => [a.name, a]));
       const ctrl = makeRiggedUpdater(raw, outer, id, mixer, clips);
       return {
-        g: outer, raw, up: ctrl.up, setMode: ctrl.setMode, getMode: ctrl.getMode, k, mixer,
+        g: outer, raw, up: ctrl.up, setMode: ctrl.setMode, getMode: ctrl.getMode, k, mixer, view: ctrl.view, trackY: ctrl.trackY,
       };
     }
 
