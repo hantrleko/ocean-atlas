@@ -387,7 +387,8 @@ function loop() {
   if (steer && vw.yaw != null) { const tgt = vw.yaw + Math.PI * 2 * Math.round((rotY - vw.yaw) / (Math.PI * 2)); rotY += (tgt - rotY) * 0.04; }
   if (steer && vw.pitch != null) rotX += (vw.pitch - rotX) * 0.04;
   const mob = innerWidth < 900; // mobile: stage is the upper part of the screen, so pull back more and aim lower
-  viewDist += (((vw && vw.dist) || 0) * (mob && vw?.dist > 0 ? 1.6 : 1) - viewDist) * 0.05; lookY += (((vw && vw.lookY) || 0) * (mob ? -0.6 : 1) - lookY) * 0.05;
+  viewDist += (((vw && (mob && vw.mobDist != null ? vw.mobDist : vw.dist)) || 0) * (mob && vw?.dist > 0 ? 1.6 : 1) - viewDist) * 0.05; const wantY = vw && vw.track && cur.trackY ? cur.trackY() * 0.9 + (mob ? -1.0 : 0) : ((vw && vw.lookY) || 0) * (mob ? -0.6 : 1);
+  lookY += (wantY - lookY) * (vw && vw.track ? 0.12 : 0.05);
   stage.rotation.set(rotX * 0.5, rotY, 0);
   dist += (tDist - dist) * 0.08;
   const w = innerWidth, h = innerHeight, target = imm || w < 900 ? 0 : (270 - 378) / 2;

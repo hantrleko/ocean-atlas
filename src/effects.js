@@ -21,28 +21,35 @@ export function makeLureGlow(raw, outer) {
   const halo = new THREE.Sprite(mat); holder.add(halo);
   const core = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex(), color: 0xeaffff, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); holder.add(core);
   const light = new THREE.PointLight(0x66f0ff, 0, 3, 1.5); holder.add(light);
-  let vi = -1, lvl = 0;
+  const stalkMat = new THREE.SpriteMaterial({ map: tex(), color: 0x9ff8ff, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true });
+  const stalk = new THREE.Sprite(stalkMat); outer.add(stalk);
+  let vi = -1, si = -1, lvl = 0; const _w = new THREE.Vector3();
   const LEVEL = { lure: 1, ambush: 0.6, strike: 0.25, swim: 0.35 };
   const posAttr = skinned.geometry.attributes.position;
   return function update(t, behaviorId) {
     if (vi < 0) { // find bulb = highest vertex in world space at the current (rest-ish) pose
       raw.updateMatrixWorld(true); let best = -Infinity;
       for (let i = 0; i < posAttr.count; i++) { _v.fromBufferAttribute(posAttr, i).applyMatrix4(skinned.matrixWorld); if (_v.y > best) { best = _v.y; vi = i; } }
+      // stalk end: lowest vertex within a small radius of the bulb (where the stalk meets the bulb)
+      const bulb = _w.fromBufferAttribute(posAttr, vi).applyMatrix4(skinned.matrixWorld).clone();
+      const box = new THREE.Box3().setFromObject(skinned), R = box.getSize(new THREE.Vector3()).length() * 0.06; let low = Infinity;
+      for (let i = 0; i < posAttr.count; i++) { _v.fromBufferAttribute(posAttr, i).applyMatrix4(skinned.matrixWorld); if (_v.distanceTo(bulb) < R && _v.y < low) { low = _v.y; si = i; } }
     }
-    _v.fromBufferAttribute(posAttr, vi); skinned.applyBoneTransform(vi, _v); skinned.localToWorld(_v); outer.worldToLocal(_v);
-    holder.position.copy(_v);
+    const posed = (i, out) => { out.fromBufferAttribute(posAttr, i); skinned.applyBoneTransform(i, out); skinned.localToWorld(out); return outer.worldToLocal(out); };
+    holder.position.copy(posed(vi, _v));
+    if (si >= 0) stalk.position.copy(posed(si, _w).lerp(holder.position, 0.35));
     const target = LEVEL[behaviorId] ?? 0.4; lvl += (target - lvl) * 0.08;
     const pulse = behaviorId === 'lure' ? 0.55 + 0.45 * Math.sin(t * 5.5) ** 2
       : behaviorId === 'ambush' ? 0.7 + 0.3 * Math.sin(t * 1.3) : 0.8 + 0.2 * Math.sin(t * 2);
     const k = lvl * pulse;
-    halo.scale.setScalar(0.18 + 0.4 * k); core.scale.setScalar(0.06 + 0.08 * k);
+    halo.scale.setScalar(0.12 + 0.22 * k); core.scale.setScalar(0.05 + 0.06 * k);
+    stalk.scale.setScalar(0.05 + 0.08 * k); stalkMat.opacity = 0.3 + 0.6 * k;
     mat.opacity = 0.35 + 0.65 * k; light.intensity = 6 * k;
   };
 }
 
 /** Whale blow: mist particles rising from the blowhole while the 'blow' clip is at the surface. */
 export function makeSpout(raw, outer) {
-  const head = raw.getObjectByName('spine1'); if (!head) return null;
   const N = 260, pos = new Float32Array(N * 3), a = new Float32Array(N), sz = new Float32Array(N);
   const vel = new Float32Array(N * 3), life = new Float32Array(N).fill(-1);
   const geo = new THREE.BufferGeometry();
@@ -56,19 +63,19 @@ export function makeSpout(raw, outer) {
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
   });
   const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; outer.add(pts);
-  const anchor = new THREE.Object3D(); head.add(anchor);
-  let ready = false, i0 = 0, lastT = null;
+  let skinned = null; raw.traverse(o => { if (o.isSkinnedMesh && !skinned) skinned = o; });
+  const pa = skinned.geometry.attributes.position; let bi = -1;
+  let i0 = 0, lastT = null;
   return function update(t, behaviorId, phase) {
-    if (!ready) {
-      // blowhole: top of the body above the head bone
-      raw.updateMatrixWorld(true);
-      const box = new THREE.Box3().setFromObject(raw); head.getWorldPosition(_v); _v.y = box.max.y - (box.max.y - box.min.y) * 0.12;
-      anchor.position.copy(head.worldToLocal(_v.clone())); ready = true;
+    if (bi < 0) {
+      // glTF space: head (snout) = max z. Blowhole = highest vertex in the slab 22–32% back from the snout.
+      skinned.geometry.computeBoundingBox(); const bb = skinned.geometry.boundingBox, len = bb.max.z - bb.min.z; let best = -Infinity;
+      for (let i = 0; i < pa.count; i++) { const z = pa.getZ(i), f = (bb.max.z - z) / len; if (f > 0.22 && f < 0.32 && Math.abs(pa.getX(i)) < len * 0.05 && pa.getY(i) > best) { best = pa.getY(i); bi = i; } }
     }
     const dt = lastT == null ? 0.016 : Math.min(0.05, Math.max(0, t - lastT)); lastT = t;
     const emit = behaviorId === 'blow' && phase > 0.32 && phase < 0.62;
     if (emit) {
-      anchor.getWorldPosition(_v); outer.worldToLocal(_v);
+      _v.fromBufferAttribute(pa, bi); skinned.applyBoneTransform(bi, _v); skinned.localToWorld(_v); outer.worldToLocal(_v);
       for (let n = 0; n < 6; n++) {
         const i = i0; i0 = (i0 + 1) % N; life[i] = 0;
         pos[i * 3] = _v.x; pos[i * 3 + 1] = _v.y; pos[i * 3 + 2] = _v.z;

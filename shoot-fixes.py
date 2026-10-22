@@ -2,7 +2,7 @@
 from playwright.sync_api import sync_playwright
 from PIL import Image, ImageDraw, ImageFont
 import os
-os.makedirs("shots/fix", exist_ok=True)
+os.makedirs("shots/" + os.environ.get("PREFIX", "fix"), exist_ok=True)
 F = "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"; font = ImageFont.truetype(F, 26) if os.path.exists(F) else None
 errs = []
 import sys
@@ -28,7 +28,7 @@ with sync_playwright() as p:
         pg.click(f'#actions button[data-b="{bid}"]'); pg.wait_for_timeout(2500)
         fr = []
         for k in range(n):
-            f = f"shots/fix/{name}-{k}.png"
+            f = f"shots/{os.environ.get('PREFIX','fix')}/{name}-{k}.png"
             pg.screenshot(path=f, clip=dict(zip(("x", "y", "width", "height"), cl))); fr.append(f); pg.wait_for_timeout(gap)
         pg.close()
         cols = min(n, 4 if not mob else 5); rows = (n + cols - 1) // cols
@@ -36,6 +36,6 @@ with sync_playwright() as p:
         sh = Image.new("RGB", (W * cols, H * rows + 40), "black"); d = ImageDraw.Draw(sh)
         d.text((8, 4), f"{name} ({bid})", fill="white", font=font)
         for i, f in enumerate(fr): sh.paste(Image.open(f).convert("RGB").resize((W, H)), ((i % cols) * W, 40 + (i // cols) * H))
-        sh.save(f"shots/fix-{name}.png"); print("sheet", name, flush=True)
+        sh.save(f"shots/{os.environ.get('PREFIX','fix')}-{name}.png"); print("sheet", name, flush=True)
     b.close()
 print("\n".join(errs) or "NO PAGE ERRORS")

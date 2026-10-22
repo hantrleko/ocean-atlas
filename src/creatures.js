@@ -176,6 +176,7 @@ export const GLB_IDS = new Set(['vampire','nautilus','dumbo','angler','barreleye
 /** Skinned + AnimationMixer GLBs (skip GPU aliveMotion to avoid double deform). */
 export const RIGGED_IDS = new Set(['angler', 'whale', 'turtle', 'dumbo']);
 
+const _tv = new THREE.Vector3();
 const FADE_SEC = 0.3;
 
 const gltfLoader = new GLTFLoader();
@@ -264,6 +265,9 @@ function makeRiggedUpdater(raw, outer, id, mixer, clips) {
   const fx = [id === 'angler' && makeLureGlow(raw, outer), id === 'whale' && makeSpout(raw, outer)].filter(Boolean);
   const activeId = () => (mode === 'auto' ? list[autoIdx]?.id : mode);
   /** Camera hint for the current behaviour ({yaw, pitch, dist, lookY}) — consumed by main.js. */
+  const trackBone = raw.getObjectByName(id === 'whale' ? 'spine3' : 'root');
+  /** World-space height of the body centre (for camera tracking during breach). */
+  function trackY() { if (!trackBone) return 0; trackBone.getWorldPosition(_tv); return _tv.y; }
   function view() { return behaviorsFor(id).find(b => b.id === activeId())?.view || null; }
 
   function setMode(m) {
@@ -304,7 +308,7 @@ function makeRiggedUpdater(raw, outer, id, mixer, clips) {
 
   up.setMode = setMode;
   up.getMode = getMode;
-  return { up, setMode, getMode, mixer, view };
+  return { up, setMode, getMode, mixer, view, trackY };
 }
 
 /**
@@ -332,7 +336,7 @@ export async function loadCreature(id) {
       const clips = Object.fromEntries(template.animations.map(a => [a.name, a]));
       const ctrl = makeRiggedUpdater(raw, outer, id, mixer, clips);
       return {
-        g: outer, raw, up: ctrl.up, setMode: ctrl.setMode, getMode: ctrl.getMode, k, mixer, view: ctrl.view,
+        g: outer, raw, up: ctrl.up, setMode: ctrl.setMode, getMode: ctrl.getMode, k, mixer, view: ctrl.view, trackY: ctrl.trackY,
       };
     }
 

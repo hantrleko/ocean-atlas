@@ -40,7 +40,7 @@ export const MOTION = {
     behaviors: null,
   },
   jelly: {
-    kind: 'jelly', undulate: 0.08, freq: 1.4, bob: 0.12, yaw: 0.1, pitch: 0.06, roll: 0.08,
+    kind: 'jelly', undulate: 0.08, freq: 1.4, bob: 0.12, yaw: 0.1, pitch: 0.02, roll: 0.03,
     behaviors: null,
   },
   physalia: {
