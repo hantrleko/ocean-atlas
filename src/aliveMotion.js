@@ -5,6 +5,7 @@
  * Materials are cloned per display instance so the GLB cache template stays clean.
  */
 import * as THREE from 'three';
+import { BEHAVIORS, behaviorsFor, behaviorLabelFor } from './behaviors.js';
 
 /**
  * Per-species motion profiles.
@@ -17,100 +18,56 @@ import * as THREE from 'three';
 export const MOTION = {
   dumbo: {
     kind: 'soft', undulate: 0.045, freq: 1.8, bob: 0.09, yaw: 0.2, pitch: 0.08, roll: 0.12,
-    behaviors: [
-      { id: 'cruise', hold: 5.5, pose: [0.04, 0.1, -0.12], amp: 1.0, freq: 1.0, bob: 1.0, sway: 1.0 },
-      { id: 'forage', hold: 5.0, pose: [0.28, 0.06, 0.08], amp: 1.15, freq: 1.1, bob: 0.85, sway: 0.9 },
-      { id: 'rest', hold: 6.0, pose: [-0.06, -0.04, 0.05], amp: 0.55, freq: 0.7, bob: 0.5, sway: 0.5 },
-    ],
+    behaviors: null,
   },
   vampire: {
     kind: 'soft', undulate: 0.04, freq: 1.5, bob: 0.1, yaw: 0.16, pitch: 0.1, roll: 0.1,
-    behaviors: [
-      { id: 'rest', hold: 5.5, pose: [0.05, 0.06, -0.08], amp: 0.7, freq: 0.75, bob: 0.6, sway: 0.6 },
-      { id: 'forage', hold: 5.0, pose: [0.22, 0.12, 0.1], amp: 1.2, freq: 1.15, bob: 1.0, sway: 1.0 },
-      { id: 'cloak', hold: 5.5, pose: [0.38, -0.05, 0.18], amp: 0.45, freq: 0.55, bob: 0.4, sway: 0.4 },
-    ],
+    behaviors: null,
   },
   angler: {
     kind: 'fish', undulate: 0.055, freq: 2.2, bob: 0.06, yaw: 0.14, pitch: 0.05, roll: 0.08,
     tailBias: 1,
-    behaviors: [
-      { id: 'rest', hold: 5.5, pose: [0.02, 0.05, 0.03], amp: 0.65, freq: 0.7, bob: 0.55, sway: 0.5 },
-      { id: 'lure', hold: 6.0, pose: [0.18, 0.08, -0.06], amp: 1.35, freq: 0.85, bob: 0.7, sway: 0.7 },
-      { id: 'hunt', hold: 4.0, pose: [-0.4, -0.12, 0.1], amp: 1.5, freq: 1.7, bob: 1.2, sway: 1.3 },
-    ],
+    behaviors: null,
   },
   barreleye: {
     kind: 'fish', undulate: 0.035, freq: 2.6, bob: 0.05, yaw: 0.12, pitch: 0.06, roll: 0.07,
     tailBias: 1,
-    behaviors: [
-      { id: 'cruise', hold: 5.0, pose: [0.04, 0.08, -0.05], amp: 1.0, freq: 1.0, bob: 1.0, sway: 1.0 },
-      { id: 'hunt', hold: 5.5, pose: [0.42, 0.05, 0.04], amp: 1.15, freq: 1.2, bob: 0.8, sway: 0.8 },
-      { id: 'cruise', hold: 4.5, pose: [-0.05, -0.1, 0.08], amp: 0.95, freq: 0.95, bob: 1.0, sway: 1.0 },
-    ],
+    behaviors: null,
   },
   gulper: {
     kind: 'fish', undulate: 0.06, freq: 1.9, bob: 0.07, yaw: 0.1, pitch: 0.12, roll: 0.06,
     tailBias: 1, long: true,
-    behaviors: [
-      { id: 'cruise', hold: 5.5, pose: [0.06, 0.06, -0.04], amp: 1.0, freq: 1.0, bob: 1.0, sway: 1.0 },
-      { id: 'hunt', hold: 5.0, pose: [0.4, 0.08, 0.06], amp: 1.35, freq: 1.25, bob: 1.1, sway: 1.1 },
-      { id: 'cruise', hold: 5.0, pose: [-0.08, -0.08, 0.05], amp: 0.9, freq: 0.9, bob: 0.9, sway: 0.9 },
-    ],
+    behaviors: null,
   },
   jelly: {
     kind: 'jelly', undulate: 0.08, freq: 1.4, bob: 0.12, yaw: 0.1, pitch: 0.06, roll: 0.08,
-    behaviors: [
-      { id: 'pulse', hold: 5.0, pose: [0.05, 0.06, -0.08], amp: 1.0, freq: 1.0, bob: 1.0, sway: 1.0 },
-      { id: 'forage', hold: 5.0, pose: [0.2, 0.1, 0.12], amp: 1.4, freq: 1.25, bob: 1.15, sway: 1.1 },
-      { id: 'rest', hold: 5.5, pose: [-0.04, -0.05, 0.04], amp: 0.5, freq: 0.6, bob: 0.45, sway: 0.5 },
-    ],
+    behaviors: null,
   },
   physalia: {
     kind: 'tendril', undulate: 0.05, freq: 1.1, bob: 0.08, yaw: 0.08, pitch: 0.04, roll: 0.1,
-    behaviors: [
-      { id: 'patrol', hold: 6.0, pose: [0.03, 0.1, -0.08], amp: 0.9, freq: 0.9, bob: 0.85, sway: 0.9 },
-      { id: 'hunt', hold: 5.5, pose: [0.12, -0.08, 0.22], amp: 1.45, freq: 1.2, bob: 1.0, sway: 1.2 },
-      { id: 'patrol', hold: 5.5, pose: [-0.04, 0.05, 0.1], amp: 0.85, freq: 0.85, bob: 0.8, sway: 0.85 },
-    ],
+    behaviors: null,
   },
   whale: {
     kind: 'fish', undulate: 0.04, freq: 1.15, bob: 0.1, yaw: 0.1, pitch: 0.08, roll: 0.05,
     tailBias: 1, slow: true,
-    behaviors: [
-      { id: 'patrol', hold: 6.5, pose: [0.04, 0.06, -0.04], amp: 1.0, freq: 1.0, bob: 1.0, sway: 1.0 },
-      { id: 'forage', hold: 5.5, pose: [0.32, 0.04, 0.05], amp: 1.1, freq: 1.05, bob: 0.85, sway: 0.8 },
-      { id: 'display', hold: 6.0, pose: [-0.08, 0.08, 0.42], amp: 0.85, freq: 0.8, bob: 1.15, sway: 1.4 },
-      { id: 'breach', hold: 4.5, pose: [-0.35, -0.05, -0.15], amp: 1.25, freq: 1.15, bob: 1.4, sway: 1.2 },
-    ],
+    behaviors: null,
   },
   turtle: {
     kind: 'turtle', undulate: 0.022, freq: 1.6, bob: 0.07, yaw: 0.12, pitch: 0.07, roll: 0.14,
-    behaviors: [
-      { id: 'patrol', hold: 5.5, pose: [0.04, 0.12, -0.15], amp: 1.0, freq: 1.0, bob: 1.0, sway: 1.0 },
-      { id: 'forage', hold: 5.0, pose: [0.35, 0.08, 0.1], amp: 1.15, freq: 1.1, bob: 0.75, sway: 0.85 },
-      { id: 'court', hold: 5.5, pose: [-0.05, -0.1, 0.4], amp: 0.95, freq: 0.95, bob: 1.1, sway: 1.5 },
-    ],
+    behaviors: null,
   },
   hammer: {
     kind: 'fish', undulate: 0.045, freq: 2.0, bob: 0.06, yaw: 0.16, pitch: 0.05, roll: 0.09,
     tailBias: 1,
-    behaviors: [
-      { id: 'patrol', hold: 5.0, pose: [0.03, 0.14, -0.08], amp: 1.0, freq: 1.0, bob: 1.0, sway: 1.0 },
-      { id: 'hunt', hold: 4.5, pose: [0.38, -0.1, 0.08], amp: 1.4, freq: 1.45, bob: 1.15, sway: 1.2 },
-      { id: 'court', hold: 5.5, pose: [-0.06, 0.12, 0.45], amp: 0.9, freq: 0.85, bob: 1.05, sway: 1.5 },
-      { id: 'patrol', hold: 5.0, pose: [-0.04, -0.12, 0.1], amp: 1.0, freq: 1.0, bob: 1.0, sway: 1.0 },
-    ],
+    behaviors: null,
   },
   nautilus: {
     kind: 'shell', undulate: 0.012, freq: 1.0, bob: 0.1, yaw: 0.08, pitch: 0.06, roll: 0.1,
-    behaviors: [
-      { id: 'patrol', hold: 5.5, pose: [0.06, 0.05, -0.1], amp: 1.0, freq: 1.0, bob: 1.0, sway: 1.0 },
-      { id: 'forage', hold: 5.0, pose: [0.28, 0.08, 0.12], amp: 1.2, freq: 1.15, bob: 0.9, sway: 1.0 },
-      { id: 'rest', hold: 6.0, pose: [-0.05, -0.04, 0.06], amp: 0.5, freq: 0.65, bob: 0.55, sway: 0.5 },
-    ],
+    behaviors: null,
   },
 };
+
+for (const k of Object.keys(MOTION)) MOTION[k].behaviors = behaviorsFor(k);
 
 /** Chinese labels for behavior ids (optional HUD / debug). */
 export const BEHAVIOR_LABELS = {
@@ -127,13 +84,14 @@ export const BEHAVIOR_LABELS = {
   cruise: '巡游',
 };
 
-export function behaviorLabel(id) {
+export function behaviorLabel(id, speciesId) {
+  if (speciesId) return behaviorLabelFor(speciesId, id);
   return BEHAVIOR_LABELS[id] || id;
 }
 
 /** Unique behavior entries for a species (dedupe repeated ids in cycle). */
 export function uniqueBehaviors(speciesId) {
-  const list = (MOTION[speciesId] || MOTION.nautilus).behaviors || [];
+  const list = behaviorsFor(speciesId);
   const seen = new Set();
   const out = [];
   for (const b of list) {
@@ -380,6 +338,44 @@ export function applyAliveMotion(root, speciesId) {
   return { sharedTime, profile, baseAmp, baseFreq, uniformSets };
 }
 
+
+const TAU = Math.PI * 2;
+const bumpW = (x, a, b) => (x <= a || x >= b) ? 0 : Math.sin(Math.PI * (x - a) / (b - a)) ** 2;
+/** Large species-specific rigid motion patterns. L = model length (raw units). */
+export function fxOffsets(fx, t, L) {
+  const o = { px: 0, py: 0, rx: 0, ry: 0, rz: 0, sx: 0, sy: 0, sz: 0 };
+  if (!fx) return o;
+  const P = fx.period || 3, m = fx.mag || 0, u = ((t / P) % 1 + 1) % 1, s = Math.sin(TAU * u);
+  switch (fx.type) {
+    case 'pulse': { // fast contraction, slow relax
+      const c = u < 0.3 ? Math.sin(Math.PI * u / 0.3 * 0.5) : Math.cos(Math.PI * 0.5 * (u - 0.3) / 0.7);
+      const ax = fx.axis || 'y', d = L * m * 0.5 * (u < 0.3 ? u / 0.3 : 1 - (u - 0.3) / 0.7);
+      o.sx = o.sy = o.sz = -m * c; o['s' + ax] = m * 0.8 * c; o['p' + (ax === 'z' ? 'y' : ax)] = ax === 'x' ? -d : d; break; }
+    case 'tumble': o.rz = m * s; o.rx = m * 0.6 * Math.sin(TAU * u * 2 + 1); o.px = L * 0.1 * s; break;
+    case 'cloak': { const c = bumpW(u, 0.05, 0.95); o.sx = o.sz = m * c; o.sy = -m * 0.7 * c; o.rx = Math.PI * 0.9 * c; o.py = -L * 0.05 * c; break; }
+    case 'jet': { // pulsed dart (back=1 reverses direction), optional spin
+      const k = u < 0.2 ? u / 0.2 : 1 - (u - 0.2) / 0.8; const d = (fx.back ? 1 : -1) * L * m * k;
+      o.px = d; o.py = -d * 0.3; o.sx = o.sz = -0.12 * bumpW(u, 0, 0.25); o.rz = (fx.back ? 0.25 : -0.25) * k;
+      if (fx.spin) o.ry = TAU * 0.5 * Math.min(1, u / 0.5); break; }
+    case 'sink': o.py = -L * m * (0.5 + 0.5 * Math.cos(TAU * u)); o.rz = 0.08 * s; break;
+    case 'rise': o.py = L * m * (0.5 - 0.5 * Math.cos(TAU * u)); o.rz = -0.08 * s; break;
+    case 'finpaddle': o.py = L * m * Math.sin(TAU * u * 2); o.rz = 0.1 * s; break;
+    case 'tiltup': { const c = bumpW(u, 0.05, 0.9); o.rz = m * c; o.ry = 0.3 * Math.sin(TAU * u * 2) * c; break; }
+    case 'riseStrike': { const c = bumpW(u, 0.35, 0.65); o.rz = 0.9 * c; o.py = L * m * c; o.px = L * m * 0.4 * c; break; }
+    case 'sweep': o.ry = m * s; o.rz = m * 0.25 * Math.sin(TAU * u * 2); break;
+    case 'gape': { const c = bumpW(u, 0.1, 0.6); o.sy = m * 1.4 * c; o.sx = m * 0.3 * c; o.sz = m * 0.6 * c; o.px = L * 0.12 * c; break; }
+    case 'curl': o.rz = m * s; o.ry = m * 0.7 * Math.cos(TAU * u); break;
+    case 'sail': o.rz = m * s; o.px = L * 0.15 * s; o.ry = 0.2 * Math.cos(TAU * u); break;
+    case 'waves': o.py = L * m * Math.sin(TAU * u); o.rz = 0.35 * Math.cos(TAU * u); o.rx = 0.2 * s; break;
+    case 'retract': { const c = bumpW(u, 0.2, 0.7); o.sy = -m * c; o.py = L * m * 0.4 * c; break; }
+    case 'roll': { const c = bumpW(u, 0.1, 0.8); o.rx = m * c; o.py = -L * 0.05 * c; break; }
+    case 'scan': o.ry = m * s; o.rz = -0.12; o.py = -L * 0.08; break;
+    case 'pin': { const c = bumpW(u, 0.3, 0.75); o.rz = -0.9 * c; o.px = L * m * c; o.py = -L * m * 0.6 * c; break; }
+  }
+  return o;
+}
+function addFx(acc, o, w) { for (const k in acc) acc[k] += o[k] * w; return acc; }
+
 /**
  * Resolve which two behaviors we're between at time t, with hold-based cycling
  * and a smoothstep ease near the end of each hold.
@@ -440,6 +436,9 @@ export function makeAliveUpdater(raw, speciesId, alive) {
   }
   // Deduplicate by object identity
   const uniq = [...new Set(uniformSets)];
+  const rb = new THREE.Box3().setFromObject(raw).getSize(new THREE.Vector3());
+  const L = Math.max(rb.x, rb.y, rb.z) || 1;
+  let prevFx = null, fxFade = 0;
 
   let mode = 'auto'; // 'auto' | behavior id
   let locked = null;
@@ -472,6 +471,7 @@ export function makeAliveUpdater(raw, speciesId, alive) {
       return 'auto';
     }
     const b = findBehavior(id);
+    prevFx = locked ? locked.fx : null;
     mode = b.id;
     locked = b;
     lockFrom = {
@@ -498,8 +498,10 @@ export function makeAliveUpdater(raw, speciesId, alive) {
     let bobMult;
     let swayMult;
 
+    const fx = { px: 0, py: 0, rx: 0, ry: 0, rz: 0, sx: 0, sy: 0, sz: 0 };
     if (mode === 'auto' || !locked) {
       const { cur, nxt, e } = sampleBehaviors(behaviors, t, phase);
+      addFx(fx, fxOffsets(cur.fx, t, L), 1 - e); addFx(fx, fxOffsets(nxt.fx, t, L), e);
       pose = lerp3(cur.pose || [0, 0, 0], nxt.pose || [0, 0, 0], e);
       ampMult = lerp(cur.amp ?? 1, nxt.amp ?? 1, e);
       freqMult = lerp(cur.freq ?? 1, nxt.freq ?? 1, e);
@@ -509,6 +511,7 @@ export function makeAliveUpdater(raw, speciesId, alive) {
       if (lockT0 == null) lockT0 = t;
       const e = smoothstep(0, LOCK_BLEND, t - lockT0);
       const tgt = locked;
+      addFx(fx, fxOffsets(tgt.fx, t, L), e); if (prevFx) addFx(fx, fxOffsets(prevFx, t, L), 1 - e);
       pose = lerp3(lockFrom.pose, tgt.pose || [0, 0, 0], e);
       ampMult = lerp(lockFrom.amp, tgt.amp ?? 1, e);
       freqMult = lerp(lockFrom.freq, tgt.freq ?? 1, e);
@@ -533,10 +536,11 @@ export function makeAliveUpdater(raw, speciesId, alive) {
     const pitchW = Math.sin(t * 0.42 + phase * 1.3) * profile.pitch * 0.4 * swayMult;
     const rollW = Math.sin(t * 0.5 + phase * 0.7) * profile.roll * 0.35 * swayMult;
 
-    raw.position.y = bob;
-    raw.rotation.x = pose[0] + pitchW;
-    raw.rotation.y = pose[1] + yawW;
-    raw.rotation.z = pose[2] + rollW;
+    raw.position.set(fx.px, bob + fx.py, 0);
+    raw.rotation.x = pose[0] + pitchW + fx.rx;
+    raw.rotation.y = pose[1] + yawW + fx.ry;
+    raw.rotation.z = pose[2] + rollW + fx.rz;
+    raw.scale.set(1 + fx.sx, 1 + fx.sy, 1 + fx.sz);
 
     for (const u of uniq) {
       const bAmp = u.baseAmp ?? alive.baseAmp ?? profile.undulate;

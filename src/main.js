@@ -109,7 +109,7 @@ function rebuildActions(speciesId) {
   const behaviors = uniqueBehaviors(speciesId);
   const chips = [
     { id: 'auto', label: '自动' },
-    ...behaviors.map(b => ({ id: b.id, label: behaviorLabel(b.id) })),
+    ...behaviors.map(b => ({ id: b.id, label: b.label || behaviorLabel(b.id, speciesId) })),
   ];
   el.innerHTML = chips.map(c =>
     `<button type="button" role="tab" data-b="${c.id}" class="${c.id === actionMode ? 'on' : ''}">${c.label}</button>`

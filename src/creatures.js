@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { applyAliveMotion, makeAliveUpdater } from './aliveMotion.js';
+import { behaviorsFor } from './behaviors.js';
 const S = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.55, metalness: 0.05, ...o });
 const P = (c, o = {}) => new THREE.MeshPhysicalMaterial({ color: c, roughness: 0.2, transparent: true, opacity: 0.45, clearcoat: 1, depthWrite: false, side: THREE.DoubleSide, ...o });
 export const glowMats = [];
@@ -174,8 +175,6 @@ export const GLB_IDS = new Set(['vampire','nautilus','dumbo','angler','barreleye
 /** Skinned + AnimationMixer GLBs (skip GPU aliveMotion to avoid double deform). */
 export const RIGGED_IDS = new Set(['angler', 'whale', 'turtle', 'dumbo']);
 
-const CLIP_IDLE_BEHAVIORS = new Set(['rest', 'idle', 'display', 'court']);
-const CLIP_LURE_BEHAVIORS = new Set(['hunt', 'lure']);
 const FADE_SEC = 0.3;
 
 const gltfLoader = new GLTFLoader();
@@ -222,15 +221,9 @@ function cloneMaterials(root) {
   });
 }
 
-/** Map UI behavior id → AnimationClip for a rigged species. */
+/** Map UI behavior id → AnimationClip (clip names == behavior ids, authored in Blender). */
 function clipForBehavior(id, behaviorId, clips) {
-  if (id === 'angler') {
-    if (CLIP_LURE_BEHAVIORS.has(behaviorId)) return clips.lure || clips.swim;
-    return clips.swim;
-  }
-  // whale / turtle / dumbo
-  if (CLIP_IDLE_BEHAVIORS.has(behaviorId)) return clips.idle || clips.swim;
-  return clips.swim;
+  return clips[behaviorId] || clips[behaviorsFor(id)[0].id] || Object.values(clips)[0];
 }
 
 /**
@@ -263,12 +256,15 @@ function makeRiggedUpdater(raw, outer, id, mixer, clips) {
     currentAction = next;
   }
 
-  playClip(clips.swim, 0);
+  // auto: cycle through this species' own behavior list
+  const list = behaviorsFor(id).filter(b => clips[b.id]);
+  let autoIdx = 0, autoT0 = null;
+  playClip(clipForBehavior(id, list[0]?.id, clips), 0);
 
   function setMode(m) {
     if (m == null || m === 'auto') {
-      mode = 'auto';
-      playClip(clips.swim);
+      mode = 'auto'; autoT0 = null;
+      playClip(clipForBehavior(id, list[autoIdx]?.id, clips));
       return 'auto';
     }
     mode = m;
@@ -287,6 +283,13 @@ function makeRiggedUpdater(raw, outer, id, mixer, clips) {
       d = Math.min(Math.max(t - lastT, 0), 0.05);
     }
     lastT = t;
+    if (mode === 'auto' && list.length > 1) {
+      if (autoT0 == null) autoT0 = t;
+      if (t - autoT0 > (list[autoIdx].hold || 5)) {
+        autoIdx = (autoIdx + 1) % list.length; autoT0 = t;
+        playClip(clipForBehavior(id, list[autoIdx].id, clips), 0.6);
+      }
+    }
     mixer.update(d);
     // Subtle rigid bob on wrap group only — no GPU displace on skinned mesh
     if (outer) outer.position.y = Math.sin(t * 0.9) * 0.025;
