@@ -417,7 +417,7 @@ function makeRiggedUpdater(raw, outer, id, mixer, clips) {
 
   up.setMode = setMode;
   up.getMode = getMode;
-  return { up, setMode, getMode, mixer, view, trackY };
+  return { up, setMode, getMode, mixer, view, trackY, active: activeId };
 }
 
 /**
@@ -442,7 +442,7 @@ export async function loadCreature(id, onProgress) {
       const ctrl = makeRiggedUpdater(raw, outer, id, mixer, clips);
       return {
         fit,
-        g: outer, raw, up: ctrl.up, setMode: ctrl.setMode, getMode: ctrl.getMode, k, mixer, view: ctrl.view, trackY: ctrl.trackY,
+        g: outer, raw, up: ctrl.up, setMode: ctrl.setMode, getMode: ctrl.getMode, k, mixer, view: ctrl.view, trackY: ctrl.trackY, active: ctrl.active,
       };
     }
 
@@ -451,7 +451,7 @@ export async function loadCreature(id, onProgress) {
     const { outer, k } = wrapModel(raw, 2.8, true);
     const ctrl = makeAliveUpdater(raw, id, alive);
     const fit = measureFitStatic(outer, raw, id, ctrl);
-    return { fit, g: outer, raw, up: ctrl.up, setMode: ctrl.setMode, getMode: ctrl.getMode, k };
+    return { fit, g: outer, raw, up: ctrl.up, setMode: ctrl.setMode, getMode: ctrl.getMode, k, active: ctrl.active };
   } catch (err) {
     console.warn(`[ocean-atlas] GLB load failed for ${id}, using procedural:`, err?.message || err);
     return build(id);

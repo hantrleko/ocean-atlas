@@ -452,6 +452,7 @@ export function makeAliveUpdater(raw, speciesId, alive) {
   let prevFx = null, fxFade = 0;
 
   let mode = 'auto'; // 'auto' | behavior id
+  let activeId = behaviors[0]?.id;
   let locked = null;
   let lockFrom = {
     pose: [0, 0, 0],
@@ -511,7 +512,7 @@ export function makeAliveUpdater(raw, speciesId, alive) {
 
     const fx = { px: 0, py: 0, rx: 0, ry: 0, rz: 0, sx: 0, sy: 0, sz: 0 };
     if (mode === 'auto' || !locked) {
-      const { cur, nxt, e } = sampleBehaviors(behaviors, t, phase);
+      const { cur, nxt, e, id: sid } = sampleBehaviors(behaviors, t, phase); activeId = sid;
       addFx(fx, fxOffsets(cur.fx, t, L), 1 - e); addFx(fx, fxOffsets(nxt.fx, t, L), e);
       pose = lerp3(cur.pose || [0, 0, 0], nxt.pose || [0, 0, 0], e);
       ampMult = lerp(cur.amp ?? 1, nxt.amp ?? 1, e);
@@ -563,5 +564,5 @@ export function makeAliveUpdater(raw, speciesId, alive) {
 
   up.setMode = setMode;
   up.getMode = getMode;
-  return { up, setMode, getMode };
+  return { up, setMode, getMode, active: () => (mode === 'auto' ? activeId : mode) };
 }

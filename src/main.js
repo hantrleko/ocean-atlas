@@ -6,6 +6,8 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { SPECIES } from './species.js';
 import { build, glowMats, loadCreature, prefetchCreature, isCached } from './creatures.js';
 import { uniqueBehaviors, behaviorLabel } from './aliveMotion.js';
+import { createEnv } from './env.js';
+import { createAudio } from './audio.js';
 
 const $ = s => document.querySelector(s), body = document.body;
 const canvas = $('#c'), R = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
@@ -55,6 +57,24 @@ const pm = new THREE.ShaderMaterial({
 });
 scene.add(new THREE.Points(pg, pm));
 const stage = new THREE.Group(); scene.add(stage);
+
+// per-species environment + sound
+const audio = createAudio();
+const envx = createEnv({ scene, mobile: innerWidth < 900 || /Mobi|Android|iPhone/.test(navigator.userAgent), snowMat: pm, onSplash: k => audio.splash(k) });
+const LB = { hemi: hemi, key: key, hemiMul: 1, keyMul: 1, expBase: 1, hemiBase: 1.35, keyBase: 2.4 };
+scene.fog = new THREE.FogExp2(0x071018, 0.045);
+let lastBeh = null;
+{ // sound UI (Chinese); muted until the user taps
+  const btn = $('#bSound'), wrap = $('#snd'), range = $('#volR'), hint = $('#sndHint'); let ht = 0, ct = 0;
+  const say = m => { hint.textContent = m; hint.classList.add('on'); clearTimeout(ht); ht = setTimeout(() => hint.classList.remove('on'), 1800); };
+  audio.onChange((on, v) => {
+    btn.textContent = on ? (v < .01 ? '🔈' : '🔊') : '🔇'; btn.classList.toggle('on', on); wrap.classList.toggle('on', on);
+    btn.title = btn.ariaLabel = on ? '关闭声音' : '开启声音'; btn.setAttribute('aria-pressed', on); range.value = Math.round(v * 100);
+  });
+  btn.onclick = async () => { await audio.toggle(); say(audio.on ? `声音已开启 · 音量 ${Math.round(audio.vol * 100)}%` : '声音已关闭');
+    if (audio.on) { wrap.classList.add('open'); clearTimeout(ct); ct = setTimeout(() => wrap.classList.remove('open'), 3000); } else wrap.classList.remove('open'); };
+  range.oninput = () => { audio.setVolume(range.value / 100); clearTimeout(ct); ct = setTimeout(() => wrap.classList.remove('open'), 3000); };
+}
 
 // postprocessing — soft bloom (stronger in dark theme)
 const composer = new EffectComposer(R);
@@ -157,6 +177,10 @@ async function select(i, instant) {
   actionMode = 'auto';
   rebuildActions(s.id);
   info(s);
+  envx.set(s.id, instant);
+  body.classList.toggle('env-dark', !!envx.preset().dark);
+  audio.setSpecies(s.id, envx.preset().amb);
+  lastBeh = null;
   applyTheme();
   vY = instant ? 0 : 0.05;
   let n;
@@ -229,30 +253,24 @@ function flightsStep(dt) {
 function applyTheme() {
   const dark = body.classList.contains('dark');
   glowMats.forEach(m => m.emissiveIntensity = m.userData.base * (dark ? 1.5 : 0.55));
-  hemi.intensity = dark ? 0.55 : 1.35;
-  hemi.color.set(dark ? 0x9fd8ff : 0xfff8f0);
-  hemi.groundColor.set(dark ? 0x061a2e : 0x9aa8b8);
-  key.intensity = dark ? 1.15 : 2.4;
-  key.color.set(dark ? 0xd8f0ff : 0xfff6ea);
+  LB.hemiBase = dark ? 0.55 : 1.35;
+  LB.keyBase = dark ? 1.15 : 2.4;
+  envx.setDark(dark);
   rim.intensity = dark ? 2.8 : 0.45;
   fill.intensity = dark ? 0.35 : 0.55;
   bounce.intensity = dark ? 0.15 : 0.35;
-  pm.uniforms.col.value.set(dark ? 0x9ff6ff : 0x8a96a8);
-  pm.uniforms.op.value = dark ? .85 : .4;
   pm.blending = dark ? THREE.AdditiveBlending : THREE.NormalBlending;
   pm.needsUpdate = true;
   shadow.material.opacity = dark ? .35 : 1;
-  R.toneMappingExposure = dark ? 1.15 : 1.02;
+  LB.expBase = dark ? 1.15 : 1.02;
   scene.traverse(o => { if (o.isPointLight) o.intensity = dark ? 3 : 1; });
   // fog + bloom
   if (dark) {
-    scene.fog = new THREE.FogExp2(0x071018, 0.045);
     bloomBase.strength = 0.45;
     bloom.strength = isMobile() ? bloomBase.strength * bloomBase.mobileScale : bloomBase.strength;
     bloom.threshold = 0.85;
     bloom.radius = 0.45;
   } else {
-    scene.fog = new THREE.FogExp2(0xe8e0d0, 0.022);
     bloomBase.strength = 0.12;
     bloom.strength = isMobile() ? bloomBase.strength * bloomBase.mobileScale : bloomBase.strength;
     bloom.threshold = 0.92;
@@ -470,6 +488,11 @@ function loop() {
   flights.forEach(f => f.o.up(t, dt));
   if (cur && !flights.some(f => f.o === cur)) cur.up(t, dt);
   pm.uniforms.t.value = t;
+  const beh = cur && !flights.some(f => f.o === cur) ? cur.active?.() : null;
+  envx.update(t, dt, { beh, cur, lights: LB, fog: scene.fog, renderer: R });
+  hemi.intensity = LB.hemiBase * LB.hemiMul / 1.3; key.intensity = LB.keyBase * LB.keyMul;
+  if (beh && beh !== lastBeh) { if (lastBeh !== null || actionMode !== 'auto') audio.behavior(cur.s.id, beh); lastBeh = beh; }
+  if (window.__oa) { window.__oa.beh = beh; window.__oa.env = envx.id; window.__oa.audio = audio; window.__oa.emit = envx.emit; window.__oa.trackY = cur?.trackY?.(); }
   $('#dot').style.transform = `translate(${Math.sin(rotY) * 10}px,${-Math.cos(rotY) * 10}px)`;
   composer.render();
   if (cur && fr % 2 === 0) {
