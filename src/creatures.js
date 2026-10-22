@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { DRACOLoader, DRACO_GLTF_CONFIG } from 'three/addons/loaders/DRACOLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { applyAliveMotion, makeAliveUpdater } from './aliveMotion.js';
 import { behaviorsFor } from './behaviors.js';
@@ -174,17 +174,60 @@ export function build(id) { const r = B[id](); const box = new THREE.Box3().setF
 export const GLB_IDS = new Set(['vampire','nautilus','dumbo','angler','barreleye','gulper','jelly','physalia','whale','turtle','hammer']);
 
 /** Skinned + AnimationMixer GLBs (skip GPU aliveMotion to avoid double deform). */
-export const RIGGED_IDS = new Set(['angler', 'whale', 'turtle', 'dumbo']);
+export const RIGGED_IDS = new Set(['angler', 'whale', 'turtle', 'dumbo', 'vampire', 'gulper', 'hammer']);
 
 const _tv = new THREE.Vector3();
 const FADE_SEC = 0.3;
 
 const gltfLoader = new GLTFLoader();
 const dracoLoader = new DRACOLoader();
-dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
+// Self-hosted glTF Draco decoder (wasm + wrapper) bundled by Vite via import.meta.url —
+// served from our own assets/ so it is base-path safe under /ocean-atlas/ and needs no CDN.
+dracoLoader.setDecoderPath(DRACO_GLTF_CONFIG);
+dracoLoader.preload();
 gltfLoader.setDRACOLoader(dracoLoader);
 /** Cached { scene, animations } — we clone per display so fly-out can dispose safely. */
 const glbCache = new Map();
+/** In-flight GLB fetch/parse promises so a prefetch and a real select share one download. */
+const glbPending = new Map();
+
+/**
+ * Fetch + parse a species GLB once. onProgress(fraction 0..1) is called while downloading.
+ * Uses Content-Length when available, otherwise an estimate from MODEL_BYTES.
+ */
+function fetchTemplate(id, onProgress) {
+  if (glbCache.has(id)) { onProgress?.(1); return Promise.resolve(glbCache.get(id)); }
+  let p = glbPending.get(id);
+  const listeners = p?.listeners || new Set();
+  if (onProgress) listeners.add(onProgress);
+  if (p) return p;
+  const url = `${import.meta.env.BASE_URL}models/${id}.glb`;
+  p = gltfLoader.loadAsync(url, ev => {
+    const total = ev.lengthComputable && ev.total ? ev.total : (MODEL_BYTES[id] || 6e5);
+    const f = Math.min(0.98, ev.loaded / total);
+    listeners.forEach(fn => fn(f));
+  }).then(gltf => {
+    const t = { scene: gltf.scene, animations: gltf.animations || [] };
+    glbCache.set(id, t); glbPending.delete(id);
+    listeners.forEach(fn => fn(1));
+    return t;
+  }, err => { glbPending.delete(id); throw err; });
+  p.listeners = listeners;
+  glbPending.set(id, p);
+  return p;
+}
+
+/** Approximate compressed sizes (bytes) — progress fallback when the server omits Content-Length. */
+const MODEL_BYTES = { angler: 466e3, barreleye: 296e3, dumbo: 541e3, gulper: 563e3, hammer: 373e3, jelly: 250e3, nautilus: 445e3, physalia: 312e3, turtle: 607e3, vampire: 711e3, whale: 480e3 };
+
+/** Warm the cache for a species in the background (no-op on Save-Data / slow connections). */
+export function prefetchCreature(id) {
+  if (!GLB_IDS.has(id) || glbCache.has(id) || glbPending.has(id)) return;
+  const c = navigator.connection;
+  if (c && (c.saveData || /2g/.test(c.effectiveType || ''))) return;
+  fetchTemplate(id).catch(() => {});
+}
+export const isCached = id => !GLB_IDS.has(id) || glbCache.has(id);
 
 function wrapModel(raw, targetSize, fromGlb) {
   const box = new THREE.Box3().setFromObject(raw);
@@ -317,16 +360,10 @@ function makeRiggedUpdater(raw, outer, id, mixer, clips) {
  * falls back to procedural build() if missing or load fails.
  * Returns { g, raw, up, setMode, getMode, k, mixer? } matching build().
  */
-export async function loadCreature(id) {
+export async function loadCreature(id, onProgress) {
   if (!GLB_IDS.has(id)) return build(id);
   try {
-    let template = glbCache.get(id);
-    if (!template) {
-      const url = `${import.meta.env.BASE_URL}models/${id}.glb`;
-      const gltf = await gltfLoader.loadAsync(url);
-      template = { scene: gltf.scene, animations: gltf.animations || [] };
-      glbCache.set(id, template);
-    }
+    const template = await fetchTemplate(id, onProgress);
     const useRig = RIGGED_IDS.has(id) && template.animations.length > 0;
     const raw = useRig ? SkeletonUtils.clone(template.scene) : template.scene.clone(true);
     cloneMaterials(raw);

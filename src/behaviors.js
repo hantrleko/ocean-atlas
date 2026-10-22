@@ -31,6 +31,8 @@ export const BEHAVIORS = {
     { id: 'reach', label: '触腕伸展', hold: 5 },
     { id: 'crawl', label: '海底爬行', hold: 6 },
   ],
+  // ---- vampire / gulper / hammer are now rigged too (clips authored in ocean-atlas tools/rig/rig_new.py);
+  //      their pose/amp/fx fields below are only used by the procedural fallback if a clip is missing ----
   // ---- procedural (static GLB + shader undulation + rigid fx) ----
   vampire: [
     { id: 'drift', label: '悬浮漂游', hold: 6, pose: [0.05, 0, 0], amp: 0.8, freq: 0.7, bob: 1, sway: 1, fx: { type: 'finpaddle', period: 2.2, mag: 0.1 } },
