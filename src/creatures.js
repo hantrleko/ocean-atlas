@@ -189,6 +189,7 @@ export const RIGGED_IDS = new Set([
   'great_white', 'manta', 'orca', 'dolphin',
   'frilled_shark', 'sperm_whale', 'leatherback', 'clownfish',
   'seahorse', 'sunfish', 'blobfish', 'coelacanth',
+  'oarfish', 'giant_squid', 'octopus', 'lionsmane', 'comb_jelly',
 ]);
 
 const _tv = new THREE.Vector3();
@@ -235,9 +236,9 @@ function fetchTemplate(id, onProgress) {
 /** Approximate compressed sizes (bytes) — progress fallback when the server omits Content-Length. */
 const MODEL_BYTES = {
   angler: 466e3, barreleye: 296e3, dumbo: 541e3, gulper: 563e3, hammer: 373e3, jelly: 250e3, nautilus: 445e3, physalia: 312e3, turtle: 607e3, vampire: 711e3, whale: 480e3,
-  great_white: 1705576, manta: 1297932, frilled_shark: 2351492, oarfish: 938264, clownfish: 1959668, seahorse: 1924604,
+  great_white: 1705576, manta: 1297932, frilled_shark: 2351492, oarfish: 1614508, clownfish: 1959668, seahorse: 1924604,
   sunfish: 1720144, blobfish: 1808484, coelacanth: 1751404, orca: 1344704, dolphin: 1576744, sperm_whale: 1868988,
-  leatherback: 2662552, giant_squid: 1371692, octopus: 1094108, lionsmane: 1793540, comb_jelly: 1801404,
+  leatherback: 2662552, giant_squid: 2210896, octopus: 1963744, lionsmane: 3260888, comb_jelly: 3109988,
   spider_crab: 1385128, mantis_shrimp: 1703048, giant_isopod: 1716572, starfish: 1798284, urchin: 1134528,
 };
 

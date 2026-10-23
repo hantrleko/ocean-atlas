@@ -94,11 +94,11 @@ export const BEHAVIORS = {
     { id: 'lunge', label: '弹射咬捕', hold: 4.5 },
     { id: 'gillflare', label: '皱鳃开合', hold: 5 },
   ],
-  // ---- remaining Tripo static GLBs: procedural fx (no Blender clips) ----
+  // ---- batch 4 rigged clips (id === Blender AnimationClip name) ----
   oarfish: [
-    { id: 'upright', label: '垂直悬立', hold: 6.5, pose: [0, 0, 0], amp: 0.7, freq: 0.8, bob: 0.55, sway: 0.5, fx: { type: 'finpaddle', period: 2.6, mag: 0.04 } },
-    { id: 'dorsal', label: '背鳍波动', hold: 5.5, pose: [0, 0, 0.08], amp: 1.7, freq: 1.6, bob: 0.6, sway: 0.7, fx: { type: 'finpaddle', period: 1.05, mag: 0.1 } },
-    { id: 'dive', label: '缓慢下潜', hold: 6, pose: [0.12, 0, 0], amp: 0.6, freq: 0.6, bob: 0.5, sway: 0.45, fx: { type: 'sink', period: 6.5, mag: 0.38 } },
+    { id: 'hover', label: '垂直悬立', hold: 6 },
+    { id: 'undulate', label: '背鳍波动', hold: 5.5 },
+    { id: 'dive', label: '急速下潜', hold: 5.5, view: { track: true } },
   ],
   clownfish: [
     { id: 'nestle', label: '钻进海葵', hold: 5 },
@@ -151,25 +151,25 @@ export const BEHAVIORS = {
     { id: 'nest', label: '沙滩产卵', hold: 6 },
   ],
   giant_squid: [
-    { id: 'arms', label: '长腕捕猎', hold: 5.5, pose: [0.15, 0, 0], amp: 1.6, freq: 1.2, bob: 0.6, sway: 0.8, fx: { type: 'retract', period: 3, mag: 0.38 } },
-    { id: 'jet', label: '喷射推进', hold: 4.2, pose: [-0.1, 0, 0], amp: 1.3, freq: 1.6, bob: 0.55, sway: 0.5, fx: { type: 'jet', period: 1.45, mag: 0.5 } },
-    { id: 'duel', label: '对抗抹香鲸', hold: 5, pose: [0.2, 0.3, 0.3], amp: 1.4, freq: 1.3, bob: 0.7, sway: 0.8, fx: { type: 'tumble', period: 3.1, mag: 0.65 } },
+    { id: 'lunge', label: '长腕捕猎', hold: 5 },
+    { id: 'jet', label: '喷射推进', hold: 4.5 },
+    { id: 'duel', label: '对抗抹香鲸', hold: 6 },
   ],
   octopus: [
-    { id: 'camo', label: '变色伪装', hold: 5.5, pose: [0.05, 0, 0], amp: 0.7, freq: 0.8, bob: 0.45, sway: 0.5, fx: { type: 'pulse', period: 2.2, mag: 0.16 } },
-    { id: 'ink', label: '喷墨逃逸', hold: 4, pose: [-0.15, 0, 0], amp: 1.5, freq: 1.8, bob: 0.55, sway: 0.6, fx: { type: 'jet', period: 1.25, mag: 0.52, spin: 1 } },
-    { id: 'squeeze', label: '钻入缝隙', hold: 5, pose: [0.2, 0, 0], amp: 0.6, freq: 0.7, bob: 0.45, sway: 0.45, fx: { type: 'flatten', period: 2.6, mag: 0.5 } },
-    { id: 'probe', label: '腕尖探物', hold: 5.5, pose: [0.1, 0.15, 0], amp: 1.55, freq: 1.25, bob: 0.6, sway: 0.9, fx: { type: 'sweep', period: 3, mag: 0.48 } },
+    { id: 'camouflage', label: '变色伪装', hold: 5.5 },
+    { id: 'ink', label: '喷墨逃逸', hold: 4.5 },
+    { id: 'squeeze', label: '钻入缝隙', hold: 5.5 },
+    { id: 'probe', label: '腕尖探物', hold: 5 },
   ],
   lionsmane: [
-    { id: 'pulse', label: '伞体搏动', hold: 5.5, pose: [0, 0, 0], amp: 2.2, freq: 1.3, bob: 0.5, sway: 0.4, fx: { type: 'pulse', period: 1.55, mag: 0.3 } },
-    { id: 'net', label: '触手拖网', hold: 6, pose: [0.08, 0, 0], amp: 1.4, freq: 0.8, bob: 0.7, sway: 0.6, fx: { type: 'retract', period: 3.5, mag: 0.32 } },
-    { id: 'drift', label: '随流漂移', hold: 6.5, pose: [0.05, 0, 0.15], amp: 0.55, freq: 0.5, bob: 1.3, sway: 1.4, fx: { type: 'tumble', period: 8, mag: 0.32 } },
+    { id: 'pulse', label: '伞体搏动', hold: 5.5 },
+    { id: 'trail', label: '触手拖网', hold: 6 },
+    { id: 'drift', label: '随流漂移', hold: 6.5 },
   ],
   comb_jelly: [
-    { id: 'rainbow', label: '栉板彩虹光', hold: 5.5, pose: [0, 0, 0], amp: 1.8, freq: 1.7, bob: 0.7, sway: 0.5, fx: { type: 'pulse', period: 1.1, mag: 0.1 } },
-    { id: 'gulp', label: '吞食其他栉水母', hold: 4.5, pose: [0.1, 0, 0], amp: 0.8, freq: 0.8, bob: 0.5, sway: 0.45, fx: { type: 'gape', period: 2.3, mag: 0.4 } },
-    { id: 'swim', label: '张口游动', hold: 5.5, pose: [0.28, 0, 0], amp: 1.15, freq: 1.15, bob: 0.8, sway: 0.7, fx: { type: 'sweep', period: 3.2, mag: 0.28 } },
+    { id: 'shimmer', label: '栉板彩虹光', hold: 5.5 },
+    { id: 'gulp', label: '吞食其他栉水母', hold: 5 },
+    { id: 'cruise', label: '张口游动', hold: 5.5 },
   ],
   spider_crab: [
     { id: 'walk', label: '缓步爬行', hold: 6.5, pose: [0.32, 0, 0], amp: 0.55, freq: 0.6, bob: 0.45, sway: 0.55, fx: { type: 'sweep', period: 4.4, mag: 0.16 } },
