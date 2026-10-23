@@ -4,10 +4,13 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { SPECIES, GROUPS } from './species.js';
-import { build, glowMats, loadCreature, prefetchCreature, isCached } from './creatures.js';
+import { build, glowMats, loadCreature, prefetchCreature, isCached, releaseCreature, disposeCloneMaterials } from './creatures.js';
 import { uniqueBehaviors, behaviorLabel } from './aliveMotion.js';
-import { createEnv } from './env.js';
+import { createEnv, habitatLabel } from './env.js';
 import { createAudio } from './audio.js';
+import { frameFor } from './framing.js';
+import { createDiver, DIVER_HEIGHT_M } from './diver.js';
+import { sizeOf } from './sizes.js';
 
 const $ = s => document.querySelector(s), body = document.body;
 const canvas = $('#c'), R = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
@@ -90,7 +93,13 @@ DR.setPixelRatio(2); DR.setSize(108, 108, false);
 DR.outputColorSpace = THREE.SRGBColorSpace; DR.toneMapping = THREE.ACESFilmicToneMapping;
 const dcam = new THREE.PerspectiveCamera(30, 1, 0.05, 50);
 
-let cur = null, idx = 0, rotY = -0.5, rotX = 0.12, vY = 0, dist = 9, tDist = 9, imm = false, offX = 0;
+let cur = null, idx = 0, rotY = -0.5, rotX = 0.12, vY = 0, dist = 9, tZoom = 0, zoom = 0, imm = false, offX = 0;
+let frameDist = 9, frameFov = 35, frameAimY = 0, frameAimX = 0;
+let scaleOn = false, scaleFit = null, scaleFor = '';
+const diver = createDiver();
+diver.visible = false;
+stage.add(diver);
+const _bv = new THREE.Vector3();
 let loadToken = 0;
 const flights = [];
 
@@ -208,7 +217,8 @@ function info(s) {
     const g = groupById(s.group);
     $('#fam').textContent = g ? `${g.zh} · ${s.family}` : s.family; $('#title').textContent = s.name;
     $('#latin').textContent = `${s.latin} · ${s.en}`;
-    $('#tags').innerHTML = s.tags.map(t => `<span>${t}</span>`).join('');
+    const hab = habitatLabel(s.id);
+    $('#tags').innerHTML = s.tags.map(t => `<span>${t}</span>`).join('') + (hab ? `<span>${hab}</span>` : '');
     $('#desc').textContent = s.desc;
     $('#traits').innerHTML = Object.entries(s.traits).map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
     $('#dTitle').textContent = s.detail.title; $('#dText').textContent = s.detail.text;
@@ -224,6 +234,10 @@ async function select(i, instant) {
   ensureGroup(i);
   const token = ++loadToken;
   actionMode = 'auto';
+  applyFrame(s.id, true);
+  scaleFor = s.id;
+  diver.visible = false;
+  scaleFit = null;
   rebuildActions(s.id);
   info(s);
   envx.set(s.id, instant);
@@ -245,8 +259,9 @@ async function select(i, instant) {
   clearTimeout(showT);
   if (token === loadToken) loader.hide();
   if (token !== loadToken) {
-    // superseded — drop unused group
-    n.g.traverse(o => { if (!n.g.userData.fromGlb) o.geometry?.dispose(); });
+    disposeCloneMaterials(n.g);
+    if (!n.g.userData.fromGlb) n.g.traverse(o => { o.geometry?.dispose(); });
+    else if (isMobile() && cur?.s?.id !== s.id) releaseCreature(s.id);
     return;
   }
   if (cur) flights.push({ o: cur, t: 0, out: true });
@@ -255,10 +270,12 @@ async function select(i, instant) {
   flights.push({ o: n, t: instant ? 1 : 0, out: false });
   cur = n;
   applyActionMode();
-  // Warm the next species in the background once the current one is on stage
-  const nextId = SPECIES[(i + 1) % SPECIES.length].id;
-  const idle = window.requestIdleCallback || (fn => setTimeout(fn, 1200));
-  setTimeout(() => idle(() => { if (token === loadToken) prefetchCreature(nextId); }), 1500);
+  // Desktop only: warm the next species. Phones keep a single GLB resident.
+  if (!isMobile()) {
+    const nextId = SPECIES[(i + 1) % SPECIES.length].id;
+    const idle = window.requestIdleCallback || (fn => setTimeout(fn, 1200));
+    setTimeout(() => idle(() => { if (token === loadToken) prefetchCreature(nextId); }), 1500);
+  }
 }
 
 /** Model-load progress overlay (#loader). */
@@ -286,7 +303,9 @@ function flightsStep(dt) {
       g.rotation.y = e * 2;
       if (f.t >= 1) {
         stage.remove(g);
+        disposeCloneMaterials(g);
         if (!g.userData.fromGlb) g.traverse(o => { o.geometry?.dispose(); });
+        else if (isMobile() && f.o.s && f.o.s.id !== cur?.s?.id) releaseCreature(f.o.s.id);
         flights.splice(k, 1);
       }
     } else {
@@ -357,10 +376,13 @@ addEventListener('wheel', e => {
   if (e.target.closest('#right,#left,#carousel,#actions')) return;
   e.preventDefault(); zoomBy(e.deltaY * 0.004);
 }, { passive: false });
-function zoomBy(d) { tDist = Math.max(3.6, Math.min(12, tDist + d)); setImm(tDist < 6.6); }
+function zoomBy(d) { tZoom = Math.max(-4.8, Math.min(8, tZoom + d)); setImm(tZoom < -2.2); }
 function setImm(v) { if (v === imm) return; imm = v; body.classList.toggle('imm', v); }
-$('#bZoom').onclick = () => { tDist = imm ? 9 : 5.2; setImm(!imm); };
-$('#bReset').onclick = () => { rotY = -0.5; rotX = 0.12; tDist = 9; setImm(false); };
+$('#bZoom').onclick = () => { tZoom = imm ? 0 : -3.4; setImm(!imm); };
+$('#bReset').onclick = () => {
+  const f = frameFor(cur?.s?.id);
+  rotY = f.yaw; rotX = f.pitch; vY = 0; tZoom = 0; setImm(false);
+};
 addEventListener('keydown', e => {
   if (e.key === 'Escape') $('#bReset').onclick();
   if (e.target.tagName !== 'INPUT') {
@@ -391,7 +413,7 @@ q.onkeydown = e => {
     if (m[0]) { select(m[0][1]); res.style.display = 'none'; q.value = ''; q.blur(); }
   }
 };
-$('#bSearch').onclick = () => { setImm(false); tDist = Math.max(tDist, 9); if (isMobile()) body.classList.add('sheet-open'); q.focus(); };
+$('#bSearch').onclick = () => { setImm(false); tZoom = Math.max(tZoom, 0); if (isMobile()) body.classList.add('sheet-open'); q.focus(); };
 
 const MQ_MOBILE = matchMedia('(max-width:820px)');
 const DEG_DESK = '360° 拖动旋转 · 滚轮缩放';
@@ -465,6 +487,127 @@ $('#nav')?.addEventListener('click', () => { if (isMobile()) closeNav(); });
 $('#featGo')?.addEventListener('click', () => { if (isMobile()) closeNav(); });
 
 let holdView = 0, viewDist = 0, lookY = 0, aimY = 0, camY = 0, frameY = 0;
+
+function applyFrame(id, resetOrbit) {
+  const f = frameFor(id);
+  frameDist = f.dist;
+  frameFov = f.fov;
+  frameAimY = f.aimY || 0;
+  frameAimX = f.aimX || 0;
+  if (resetOrbit) {
+    rotY = f.yaw;
+    rotX = f.pitch;
+    vY = 0;
+    tZoom = 0;
+    setImm(false);
+  }
+}
+
+/** Species bbox in stage-local space (bind pose). */
+function stageBox(obj) {
+  const box = new THREE.Box3();
+  obj.updateWorldMatrix(true, true);
+  const world = new THREE.Box3().setFromObject(obj);
+  if (world.isEmpty()) return box;
+  const inv = stage.matrixWorld.clone().invert();
+  const { min, max } = world;
+  for (const x of [min.x, max.x]) {
+    for (const y of [min.y, max.y]) {
+      for (const z of [min.z, max.z]) {
+        _bv.set(x, y, z).applyMatrix4(inv);
+        if (Number.isFinite(_bv.x) && Number.isFinite(_bv.y) && Number.isFinite(_bv.z)) box.expandByPoint(_bv);
+      }
+    }
+  }
+  return box;
+}
+
+function layoutScale() {
+  if (!scaleOn || !cur?.g) { diver.visible = false; scaleFit = null; return; }
+  cur.g.position.x = 0;
+  cur.g.updateMatrixWorld(true);
+  const box = stageBox(cur.g);
+  if (box.isEmpty()) { diver.visible = false; scaleFit = null; return; }
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const spec = sizeOf(cur.s.id);
+  const worldLen = Math.max(size.x, size.y, size.z, 1e-4);
+  const unitsPerM = worldLen / spec.lengthMeters;
+  const diverH = DIVER_HEIGHT_M * unitsPerM;
+  const halfW = diverH * 0.22;
+  // Clear water between the animal's bbox and the diver, including long bodies seen at an angle.
+  const gap = Math.max(worldLen * 0.18, diverH * 0.15, 0.22);
+  const x = center.x + size.x / 2 + halfW + gap;
+  const minX = Math.min(box.min.x, x - halfW);
+  const maxX = Math.max(box.max.x, x + halfW);
+  const minY = Math.min(box.min.y, center.y - diverH / 2);
+  const maxY = Math.max(box.max.y, center.y + diverH / 2);
+  const minZ = Math.min(box.min.z, center.z - diverH * 0.14);
+  const maxZ = Math.max(box.max.z, center.z + diverH * 0.14);
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  const hx = Math.max((maxX - minX) / 2, (maxZ - minZ) / 2);
+  const hy = (maxY - minY) / 2;
+  const hz = (maxZ - minZ) / 2;
+  diver.scale.setScalar(unitsPerM);
+  diver.position.set(x - cx, center.y, center.z);
+  diver.userData.baseY = center.y;
+  diver.userData.h = diverH;
+  diver.visible = true;
+  if (cur.g.position.x !== -cx) cur.g.position.x = -cx;
+  diver.quaternion.copy(stage.quaternion).invert();
+  const fov = 32;
+  const aspect = Math.max(0.55, cam.aspect || 1.4);
+  const tanV = Math.tan(THREE.MathUtils.degToRad(fov / 2));
+  const tanH = tanV * aspect;
+  const pad = isMobile() ? 1.62 : 1.32;
+  const distV = (hy * pad) / tanV;
+  const distH = (hx * pad) / tanH;
+  scaleFit = { dist: Math.max(distV, distH) + hz * 0.35, fov, aimX: 0, aimY: cy + 0.1, shiftX: cx, id: cur.s.id };
+  // Snap — a slow lerp leaves tiny species as a cropped giant diver for several frames.
+  dist = scaleFit.dist;
+  zoom = 0;
+  tZoom = 0;
+  cam.fov = fov;
+  cam.far = Math.max(140, dist * 8);
+  cam.updateProjectionMatrix();
+  mobFrame.d = 0;
+  mobFrame.cy = 0;
+}
+
+function clearScaleShift() {
+  if (cur?.g) cur.g.position.x = 0;
+  diver.visible = false;
+  scaleFit = null;
+  dist = frameDist;
+  cam.fov = frameFov;
+  cam.updateProjectionMatrix();
+}
+
+{ // 比例对比：1.75 m 潜水员与当前物种并排
+  const btn = document.getElementById('bScale');
+  const hint = document.getElementById('scaleHint');
+  btn?.addEventListener('click', () => {
+    scaleOn = !scaleOn;
+    btn.classList.toggle('on', scaleOn);
+    btn.setAttribute('aria-pressed', String(scaleOn));
+    btn.title = scaleOn ? '关闭比例对比' : '比例对比';
+    tZoom = 0;
+    if (!scaleOn) clearScaleShift();
+    else if (cur && cur.s.id === scaleFor && !flights.some(f => f.o === cur)) layoutScale();
+    if (hint) {
+      const spec = cur && sizeOf(cur.s.id);
+      hint.textContent = scaleOn && spec
+        ? `比例对比 · 潜水员 ${DIVER_HEIGHT_M.toFixed(2)} 米 · ${cur.s.name}${spec.measure} ${formatMeters(spec.lengthMeters)}`
+        : '';
+      hint.classList.toggle('on', scaleOn);
+    }
+  });
+}
+function formatMeters(m) {
+  if (m >= 1) return `${Number(m.toFixed(m >= 10 ? 0 : 1))} 米`;
+  return `${Math.round(m * 100)} 厘米`;
+}
 /**
  * Phones: the free stage is the strip between the species carousel and the behaviour tabs, not the
  * whole canvas. Centre the scene in that strip (view-offset) and pull back so a ~3.4-unit creature
@@ -481,6 +624,7 @@ function measureMobileStage() {
   const sh = Math.max(120, bot - top), sw = w - 2 * 12;            // stage strip with small side margins
   const key = [cur?.s?.id, w, h, Math.round(sh)].join();
   mobFrame.y = h / 2 - (top + bot) / 2;
+  if (scaleOn && scaleFit) { mobFrame.d = 0; mobFrame.cy = 0; mobFrame.key = key + ':scale'; return; }
   if (key === mobFrame.key) return;
   mobFrame.key = key;
   const f = cur?.fit;
@@ -503,7 +647,7 @@ function measureMobileStage() {
       if (need > D) D = need;
     }
   }
-  mobFrame.d = D - 9;                     // relative to the default camera distance (can zoom in)
+  mobFrame.d = D - frameDist;              // relative to this species' resting distance
   mobFrame.cy = cy;
 }
 if (new URLSearchParams(location.search).has('debug')) window.__oa = {};
@@ -511,11 +655,25 @@ let last = performance.now(), T0 = last; let fr = 0; const tmp = new THREE.Vecto
 function loop() {
   const now = performance.now(), dt = Math.min((now - last) / 1000, 0.05), t = (now - T0) / 1000;
   last = now; fr++;
-  // per-behaviour camera hint (e.g. angler front-3/4 for the jaw, whale pull-back for breach)
-  const vw = cur && !flights.some(f => f.o === cur) ? cur.view?.() : null;
+  const settled = cur && !flights.some(f => f.o === cur);
+  if (scaleOn && settled && cur.s.id === scaleFor && scaleFit?.id !== cur.s.id) layoutScale();
+  if (scaleOn && settled && scaleFit && cur.g.position.x !== -scaleFit.shiftX) cur.g.position.x = -scaleFit.shiftX;
+  if (diver.visible) {
+    const bob = Math.sin(t * 1.25) * Math.min(0.06, (diver.userData.h || 1) * 0.03);
+    diver.position.y = (diver.userData.baseY || 0) + bob;
+  }
+  // per-behaviour camera hint — paused while the diver comparison owns the frame
+  const vw = !scaleOn && settled ? cur.view?.() : null;
   if (drag) holdView = now + 2500;
   const steer = vw && now > holdView;
-  if (!drag) { vY *= 0.94; rotY += vY + (steer && vw.yaw != null ? 0 : dt * 0.08); }
+  if (!drag) {
+    vY *= 0.94;
+    if (scaleOn && scaleFit) {
+      vY = 0;
+      rotY += (0.42 - rotY) * 0.22;
+      rotX += (0.06 - rotX) * 0.22;
+    } else rotY += vY + (steer && vw.yaw != null ? 0 : dt * 0.08);
+  }
   if (steer && vw.yaw != null) { const tgt = vw.yaw + Math.PI * 2 * Math.round((rotY - vw.yaw) / (Math.PI * 2)); rotY += (tgt - rotY) * (1 - Math.exp(-dt * (vw.yawK || 2.4))); }  // frame-rate independent
   if (steer && vw.pitch != null) rotX += (vw.pitch - rotX) * 0.04;
   if (window.__oa) { window.__oa.rotY = rotY; window.__oa.steer = !!(steer && vw.yaw != null); if (window.__oa.setYaw != null) { rotY = window.__oa.setYaw; vY = 0; } }
@@ -529,21 +687,56 @@ function loop() {
   const wantFrame = (vw && vw.frameY) || 0;
   frameY += (wantFrame - frameY) * 0.06;
   if (fr - mobFrame.at > 20 || mobFrame.at < 0 || mobFrame.cur !== cur) { measureMobileStage(); mobFrame.at = fr; mobFrame.cur = cur; }
+  if (scaleOn && scaleFit) { mobFrame.d = 0; mobFrame.cy = 0; }
   stage.rotation.set(rotX * 0.5, rotY, 0);
-  dist += (tDist - dist) * 0.08;
+  if (diver.visible) diver.quaternion.copy(stage.quaternion).invert();
+  const useScale = !!(scaleOn && scaleFit && settled);
+  const baseDist = useScale ? scaleFit.dist : frameDist;
+  const baseFov = useScale ? scaleFit.fov : frameFov;
+  const baseAimX = useScale ? scaleFit.aimX : frameAimX;
+  const baseAimY = useScale ? scaleFit.aimY : frameAimY;
+  zoom += (tZoom - zoom) * 0.08;
+  const distTarget = baseDist + zoom;
+  if (useScale && Math.abs(dist - distTarget) > Math.max(1.2, distTarget * 0.12)) dist = distTarget;
+  else dist += (distTarget - dist) * 0.08;
+  if (Math.abs(cam.fov - baseFov) > 0.02) {
+    cam.fov += (baseFov - cam.fov) * 0.08;
+    cam.updateProjectionMatrix();
+  }
+  const far = Math.max(140, dist * 8);
+  if (cam.far !== far) { cam.far = far; cam.updateProjectionMatrix(); }
   const w = innerWidth, h = innerHeight, target = imm || w < 900 ? 0 : (270 - 378) / 2;
   offX += (target - offX) * 0.08;
   cam.setViewOffset(w, h, -offX, frameY + mobFrame.y, w, h);
-  cam.position.set(0, 0.6 + rotX * 2.5 + camY + mobFrame.cy, dist + viewDist + mobFrame.d); cam.lookAt(0, -0.1 + aimY + mobFrame.cy, 0);
+  const camYpos = 0.6 + rotX * 2.5 + camY + mobFrame.cy;
+  const lookYpos = -0.1 + (useScale ? 0 : aimY) + baseAimY + mobFrame.cy;
+  cam.position.set(baseAimX, useScale ? lookYpos : camYpos, dist + (useScale ? 0 : viewDist) + mobFrame.d);
+  cam.lookAt(baseAimX, lookYpos, 0);
   flightsStep(dt);
   flights.forEach(f => f.o.up(t, dt));
   if (cur && !flights.some(f => f.o === cur)) cur.up(t, dt);
+  if (scaleOn && scaleFit && cur?.g) cur.g.position.x = -scaleFit.shiftX;
   pm.uniforms.t.value = t;
   const beh = cur && !flights.some(f => f.o === cur) ? cur.active?.() : null;
   envx.update(t, dt, { beh, cur, lights: LB, fog: scene.fog, renderer: R });
   hemi.intensity = LB.hemiBase * LB.hemiMul / 1.3; key.intensity = LB.keyBase * LB.keyMul;
   if (beh && beh !== lastBeh) { if (lastBeh !== null || actionMode !== 'auto') audio.behavior(cur.s.id, beh); lastBeh = beh; }
-  if (window.__oa) { window.__oa.beh = beh; window.__oa.env = envx.id; window.__oa.audio = audio; window.__oa.emit = envx.emit; window.__oa.trackY = cur?.trackY?.(); }
+  if (useScale && scene.fog?.isFogExp2) {
+    const thin = Math.min(1, (frameDist || 9) / Math.max(dist, 0.5));
+    scene.fog.density *= thin;
+  }
+  if (window.__oa) {
+    window.__oa.beh = beh; window.__oa.env = envx.id; window.__oa.audio = audio; window.__oa.emit = envx.emit; window.__oa.trackY = cur?.trackY?.();
+    let meshes = 0;
+    cur?.g?.traverse(o => { if (o.isMesh) meshes++; });
+    window.__oa.scale = {
+      on: scaleOn, settled, forId: scaleFor, sid: cur?.s?.id, flights: flights.length, meshes,
+      fit: scaleFit && { dist: +scaleFit.dist.toFixed(2), aimY: +scaleFit.aimY.toFixed(2), shiftX: +scaleFit.shiftX.toFixed(2), id: scaleFit.id },
+      diver: { v: diver.visible, s: +diver.scale.x.toFixed(3), p: diver.position.toArray().map(n => +n.toFixed(2)), h: +(diver.userData.h || 0).toFixed(2) },
+      cam: { p: cam.position.toArray().map(n => +n.toFixed(2)), fov: +cam.fov.toFixed(1), far: +cam.far.toFixed(0) },
+      gx: cur?.g && +cur.g.position.x.toFixed(2),
+    };
+  }
   $('#dot').style.transform = `translate(${Math.sin(rotY) * 10}px,${-Math.cos(rotY) * 10}px)`;
   composer.render();
   if (cur && fr % 2 === 0) {
@@ -568,6 +761,6 @@ syncMobileChrome();
 applyTheme();
 navBuild();
 select(+(hp.get('s') || 0), true).then(() => {
-  if (hp.get('imm')) { tDist = 4.6; setImm(true); }
+  if (hp.get('imm')) { tZoom = -4.4; setImm(true); }
 });
 loop();

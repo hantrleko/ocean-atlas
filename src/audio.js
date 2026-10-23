@@ -33,9 +33,9 @@ const SFX = {
   great_white_breach: ['whale-breach', .75, 1.15, 0], great_white_bite: ['jaw-snap', .95, 1, .05], great_white_cruise: ['@ping', .2],
   manta_leap: ['whale-breach', .45, 1.3, 0], manta_glide: ['@hum', .25], manta_hover: ['bubbles', .3, 1.2, 0],
   frilled_shark_lunge: ['jaw-snap', .8, .85, .05], frilled_shark_slither: ['jet-whoosh', .35, .7, 0],
-  oarfish_dive: ['bubbles', .35, .7, 0], oarfish_undulate: ['@hum', .3],
+  oarfish_dive: ['bubbles', .4, .65, 0], oarfish_undulate: ['@hum', .32], oarfish_hover: ['@hum', .22],
   clownfish_chase: ['jet-whoosh', .4, 1.3, 0], clownfish_fan: ['bubbles', .3, 1.4, 0],
-  seahorse_sip: ['@ping', .3], seahorse_dance: ['@chime', .3], seahorse_brood: ['bubbles', .25, .9, 0],
+  seahorse_sip: ['@ping', .35], seahorse_dance: ['@chime', .35], seahorse_brood: ['bubbles', .3, .9, 0], seahorse_grip: ['@thud', .28],
   sunfish_dive: ['bubbles', .45, .8, 0], sunfish_bask: ['@hum', .25],
   blobfish_gulp: ['jaw-snap', .4, .6, .1], blobfish_drift: ['@hum', .2],
   coelacanth_lobefin: ['bubbles', .3, .85, 0], coelacanth_cave: ['@thud', .25],
@@ -45,13 +45,13 @@ const SFX = {
   leatherback_dive: ['bubbles', .55, .75, 0], leatherback_nest: ['@thud', .35],
   giant_squid_jet: ['jet-whoosh', .9, .8, 0], giant_squid_duel: ['whale-lobtail', .4, .7, 0], giant_squid_lunge: ['@hum', .3],
   octopus_ink: ['jet-whoosh', .85, 1, 0], octopus_squeeze: ['bubbles', .35, 1.1, 0], octopus_probe: ['@ping', .2],
-  lionsmane_pulse: ['@pulse', .4], lionsmane_drift: ['@hum', .25],
+  lionsmane_pulse: ['@pulse', .45], lionsmane_drift: ['@hum', .25], lionsmane_trail: ['@hum', .32],
   comb_jelly_shimmer: ['@chime', .28], comb_jelly_gulp: ['@pulse', .3],
   spider_crab_walk: ['@thud', .3], spider_crab_molt: ['@crunch', .35],
   mantis_shrimp_punch: ['@thud', .85], mantis_shrimp_display: ['@chime', .35],
   giant_isopod_ball: ['@thud', .4], giant_isopod_scavenge: ['@crunch', .3],
-  starfish_evert: ['@crunch', .25], starfish_crawl: ['bubbles', .2, .7, 0],
-  urchin_graze: ['@crunch', .4], urchin_spin: ['@ping', .2],
+  starfish_evert: ['@crunch', .35], starfish_crawl: ['bubbles', .25, .7, 0], starfish_regenerate: ['@chime', .22],
+  urchin_graze: ['@crunch', .4], urchin_spin: ['@ping', .2], urchin_tube: ['bubbles', .2, .8, 0],
 };
 const SPLASH = 'whale-breach';
 const filesFor = sp => [...new Set(Object.entries(SFX).filter(([k, v]) => k.startsWith(sp + '_') && !v[0].startsWith('@')).map(([, v]) => v[0]).concat(sp === 'whale' ? [SPLASH] : []))];

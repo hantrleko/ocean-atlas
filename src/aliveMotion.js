@@ -405,6 +405,7 @@ export function fxOffsets(fx, t, L) {
     case 'scan': o.ry = m * s; o.rz = -0.12; o.py = -L * 0.08; break;
     case 'pin': { const c = bumpW(u, 0.3, 0.75); o.rz = -0.9 * c; o.px = L * m * c; o.py = -L * m * 0.6 * c; break; }
     case 'orbit': { const a = TAU * u; o.px = Math.cos(a) * L * m; o.pz = Math.sin(a) * L * m; o.ry = a; break; }
+    case 'crawl': o.px = L * m * Math.sin(TAU * u); o.ry = 0.35 * Math.sin(TAU * u); o.rz = 0.1 * Math.sin(TAU * u * 4); break;
     case 'spin': o.ry = TAU * u * (fx.turns || 1); break;
     case 'flatten': { const c = bumpW(u, 0.15, 0.85); o.sy = -m * c; o.sx = o.sz = m * 0.35 * c; o.py = -L * 0.04 * c; break; }
   }
@@ -556,11 +557,13 @@ export function makeAliveUpdater(raw, speciesId, alive) {
       swayMult = lerp(lockFrom.sway, tgt.sway ?? 1, e);
     }
 
-    // Never freeze — keep visible undulation / bob / sway even on "rest"
-    ampMult = Math.max(ampMult, 0.5);
-    bobMult = Math.max(bobMult, 0.45);
-    swayMult = Math.max(swayMult, 0.45);
-    freqMult = Math.max(freqMult, 0.55);
+    // Never freeze — keep a little undulation even on "rest".
+    // Locked tabs use a lower floor so a quiet pose and a big one don't look the same.
+    const poseLocked = mode !== 'auto';
+    ampMult = Math.max(ampMult, poseLocked ? 0.28 : 0.5);
+    bobMult = Math.max(bobMult, poseLocked ? 0.22 : 0.45);
+    swayMult = Math.max(swayMult, poseLocked ? 0.22 : 0.45);
+    freqMult = Math.max(freqMult, poseLocked ? 0.4 : 0.55);
 
     lastPose = pose;
     lastAmp = ampMult;
@@ -587,7 +590,12 @@ export function makeAliveUpdater(raw, speciesId, alive) {
     }
   }
 
+  function view() {
+    const idNow = mode === 'auto' ? activeId : mode;
+    return (profile.behaviors || []).find(b => b.id === idNow)?.view || null;
+  }
+
   up.setMode = setMode;
   up.getMode = getMode;
-  return { up, setMode, getMode, active: () => (mode === 'auto' ? activeId : mode) };
+  return { up, setMode, getMode, view, active: () => (mode === 'auto' ? activeId : mode) };
 }

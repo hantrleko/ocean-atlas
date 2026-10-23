@@ -4,6 +4,7 @@ import { DRACOLoader, DRACO_GLTF_CONFIG } from 'three/addons/loaders/DRACOLoader
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { applyAliveMotion, makeAliveUpdater } from './aliveMotion.js';
 import { behaviorsFor } from './behaviors.js';
+import { frameFor } from './framing.js';
 import { makeLureGlow, makeSpout, makeMouthCavity } from './effects.js';
 const S = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.55, metalness: 0.05, ...o });
 const P = (c, o = {}) => new THREE.MeshPhysicalMaterial({ color: c, roughness: 0.2, transparent: true, opacity: 0.45, clearcoat: 1, depthWrite: false, side: THREE.DoubleSide, ...o });
@@ -252,6 +253,37 @@ export function prefetchCreature(id) {
 }
 export const isCached = id => !GLB_IDS.has(id) || glbCache.has(id);
 
+/** Drop a cached GLB (geometry + textures). Call only after its on-screen clone is gone. */
+export function releaseCreature(id) {
+  if (glbPending.has(id)) return;
+  const t = glbCache.get(id);
+  if (!t) return;
+  glbCache.delete(id);
+  t.scene.traverse(o => {
+    if (!o.isMesh) return;
+    o.geometry?.dispose();
+    const mats = Array.isArray(o.material) ? o.material : (o.material ? [o.material] : []);
+    mats.forEach(m => {
+      m.map?.dispose();
+      m.normalMap?.dispose();
+      m.roughnessMap?.dispose();
+      m.metalnessMap?.dispose();
+      m.emissiveMap?.dispose();
+      m.aoMap?.dispose();
+      m.dispose();
+    });
+  });
+}
+
+/** Dispose materials cloned onto a displayed creature. Geometry stays with the template. */
+export function disposeCloneMaterials(root) {
+  root?.traverse(o => {
+    if (!o.isMesh || !o.material) return;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    mats.forEach(m => m.dispose());
+  });
+}
+
 function wrapModel(raw, targetSize, fromGlb) {
   const box = new THREE.Box3().setFromObject(raw);
   const size = box.getSize(new THREE.Vector3());
@@ -359,6 +391,51 @@ function clipForBehavior(id, behaviorId, clips) {
   return clips[behaviorId] || clips[behaviorsFor(id)[0].id] || Object.values(clips)[0];
 }
 
+const _ea = new THREE.Euler();
+const _qa = new THREE.Quaternion();
+
+/** Extra local bone motion so near-identical GLB clips read as different tabs. */
+function accentPose(raw, id, beh, t) {
+  if (!raw.userData.boneMap) {
+    const map = {};
+    raw.traverse(o => { if (o.isBone) map[o.name] = o; });
+    raw.userData.boneMap = map;
+  }
+  const b = raw.userData.boneMap;
+  const mul = (node, x, y, z) => {
+    if (!node) return;
+    _ea.set(x, y, z);
+    _qa.setFromEuler(_ea);
+    node.quaternion.multiply(_qa);
+  };
+  if (id === 'seahorse') {
+    if (beh === 'grip') {
+      ['tail1', 'tail2', 'tail3', 'tail4', 'tail5'].forEach((n, i) => {
+        const k = (i + 1) / 5;
+        mul(b[n], 0, 0, 1.2 * k);
+      });
+    } else if (beh === 'brood') {
+      const p = b.pouch;
+      if (p) {
+        const s = 1 + 0.5 * (0.5 + 0.5 * Math.sin(t * 1.7));
+        p.scale.set(s, s * 1.2, s);
+      }
+      mul(b.abdomen, 0.18 * Math.sin(t * 1.7), 0, 0);
+    } else if (beh === 'sip') {
+      const jab = Math.max(0, Math.sin(t * 8)) ** 2;
+      mul(b.head, -0.75 * jab, 0.12 * Math.sin(t * 8), 0);
+      mul(b.snout, -1.15 * jab, 0, 0);
+      mul(b.neck, -0.4 * jab, 0, 0);
+    } else if (beh === 'dance') {
+      mul(b.root, 0, 0.5 * Math.sin(t * 1.6), 0.28 * Math.sin(t * 3.2));
+    }
+  } else if (id === 'sperm_whale' && beh === 'click') {
+    const k = 0.5 + 0.5 * Math.sin(t * 16);
+    mul(b.jaw, 0.32 * k, 0, 0);
+    mul(b.head, 0.05 * Math.sin(t * 16), 0.1 * Math.sin(t * 8), 0);
+  }
+}
+
 /**
  * AnimationMixer controller for skinned GLBs.
  * setMode keeps chip API; auto → swim; locked behaviors map to swim/lure/idle.
@@ -368,9 +445,10 @@ function makeRiggedUpdater(raw, outer, id, mixer, clips) {
   let currentAction = null;
   let lastT = null;
 
-  function playClip(clip, fade = FADE_SEC) {
+  function playClip(clip, fade = FADE_SEC, behaviorId) {
     if (!clip) return;
     const next = mixer.clipAction(clip);
+    next.timeScale = behaviorsFor(id).find(b => b.id === behaviorId)?.rate || 1;
     if (currentAction === next && next.isRunning()) return;
     next.enabled = true;
     next.reset();
@@ -392,7 +470,7 @@ function makeRiggedUpdater(raw, outer, id, mixer, clips) {
   // auto: cycle through this species' own behavior list
   const list = behaviorsFor(id).filter(b => clips[b.id]);
   let autoIdx = 0, autoT0 = null;
-  playClip(clipForBehavior(id, list[0]?.id, clips), 0);
+  playClip(clipForBehavior(id, list[0]?.id, clips), 0, list[0]?.id);
   const fx = [id === 'angler' && makeLureGlow(raw, outer), id === 'angler' && makeMouthCavity(raw), id === 'whale' && makeSpout(raw, outer)].filter(Boolean);
   const activeId = () => (mode === 'auto' ? list[autoIdx]?.id : mode);
   /** Camera hint for the current behaviour ({yaw, pitch, dist, lookY}) — consumed by main.js. */
@@ -404,11 +482,11 @@ function makeRiggedUpdater(raw, outer, id, mixer, clips) {
   function setMode(m) {
     if (m == null || m === 'auto') {
       mode = 'auto'; autoT0 = null;
-      playClip(clipForBehavior(id, list[autoIdx]?.id, clips));
+      playClip(clipForBehavior(id, list[autoIdx]?.id, clips), FADE_SEC, list[autoIdx]?.id);
       return 'auto';
     }
     mode = m;
-    playClip(clipForBehavior(id, m, clips));
+    playClip(clipForBehavior(id, m, clips), FADE_SEC, m);
     return mode;
   }
 
@@ -427,10 +505,11 @@ function makeRiggedUpdater(raw, outer, id, mixer, clips) {
       if (autoT0 == null) autoT0 = t;
       if (t - autoT0 > (list[autoIdx].hold || 5)) {
         autoIdx = (autoIdx + 1) % list.length; autoT0 = t;
-        playClip(clipForBehavior(id, list[autoIdx].id, clips), 0.6);
+        playClip(clipForBehavior(id, list[autoIdx].id, clips), 0.6, list[autoIdx].id);
       }
     }
     mixer.update(d);
+    accentPose(raw, id, activeId(), t);
     const ph = currentAction ? (currentAction.time / currentAction.getClip().duration) : 0;
     if (outer) outer.position.y = 0;
     for (const f of fx) f(t, activeId(), ph);
@@ -455,9 +534,10 @@ export async function loadCreature(id, onProgress) {
     const useRig = RIGGED_IDS.has(id) && template.animations.length > 0;
     const raw = useRig ? SkeletonUtils.clone(template.scene) : template.scene.clone(true);
     cloneMaterials(raw);
+    const fitSize = frameFor(id).size;
 
     if (useRig) {
-      const { outer, k } = wrapModel(raw, 2.8, true);
+      const { outer, k } = wrapModel(raw, fitSize, true);
       if (id === 'gulper') brightenDeepSea(raw);
       const mixer = new THREE.AnimationMixer(raw);
       const clips = Object.fromEntries(template.animations.map(a => [a.name, a]));
@@ -471,10 +551,10 @@ export async function loadCreature(id, onProgress) {
 
     // Static GLB: GPU alive displacement + behavioral rigid pose
     const alive = applyAliveMotion(raw, id);
-    const { outer, k } = wrapModel(raw, 2.8, true);
+    const { outer, k } = wrapModel(raw, fitSize, true);
     const ctrl = makeAliveUpdater(raw, id, alive);
     const fit = measureFitStatic(outer, raw, id, ctrl);
-    return { fit, g: outer, raw, up: ctrl.up, setMode: ctrl.setMode, getMode: ctrl.getMode, k, active: ctrl.active };
+    return { fit, g: outer, raw, up: ctrl.up, setMode: ctrl.setMode, getMode: ctrl.getMode, k, active: ctrl.active, view: ctrl.view };
   } catch (err) {
     console.warn(`[ocean-atlas] GLB load failed for ${id}, using procedural:`, err?.message || err);
     return build(id);

@@ -96,9 +96,9 @@ export const BEHAVIORS = {
   ],
   // ---- batch 4 rigged clips (id === Blender AnimationClip name) ----
   oarfish: [
-    { id: 'hover', label: '垂直悬立', hold: 6 },
-    { id: 'undulate', label: '背鳍波动', hold: 5.5 },
-    { id: 'dive', label: '急速下潜', hold: 5.5, view: { track: true } },
+    { id: 'hover', label: '垂直悬立', hold: 6, view: { yaw: 0.12, pitch: 0.02, dist: 0.15 } },
+    { id: 'undulate', label: '背鳍波动', hold: 5.5, view: { yaw: 0.95, pitch: 0.04, dist: -0.35 } },
+    { id: 'dive', label: '急速下潜', hold: 5.5, view: { yaw: 0.35, pitch: 0.22, dist: 0.7, track: true } },
   ],
   clownfish: [
     { id: 'nestle', label: '钻进海葵', hold: 5 },
@@ -107,10 +107,10 @@ export const BEHAVIORS = {
   ],
   // ---- batch 3 rigged clips (id === Blender AnimationClip name) ----
   seahorse: [
-    { id: 'grip', label: '尾卷海草', hold: 5.5 },
-    { id: 'brood', label: '雄性育儿', hold: 6 },
-    { id: 'sip', label: '吸管捕食', hold: 4.5 },
-    { id: 'dance', label: '求偶共舞', hold: 5.5 },
+    { id: 'grip', label: '尾卷海草', hold: 5.5, rate: 0.7, view: { yaw: 1.25, pitch: 0.06, dist: -0.3 } },
+    { id: 'brood', label: '雄性育儿', hold: 6, rate: 0.55, view: { yaw: 0.15, pitch: 0.28, dist: -0.9 } },
+    { id: 'sip', label: '吸管捕食', hold: 4.5, rate: 1.7, view: { yaw: 0.4, pitch: 0.16, dist: -1.5 } },
+    { id: 'dance', label: '求偶共舞', hold: 5.5, rate: 1.15, view: { yaw: 0.85, pitch: 0.04, dist: 0.5 } },
   ],
   sunfish: [
     { id: 'bask', label: '侧躺晒日', hold: 6, view: { yaw: 0.4, pitch: 0.12 } },
@@ -140,10 +140,10 @@ export const BEHAVIORS = {
     { id: 'bubble', label: '泡泡环', hold: 5 },
   ],
   sperm_whale: [
-    { id: 'sleep', label: '垂直睡眠', hold: 6, view: { pitch: 0.18, dist: 2.2, mobDist: 3.4, track: true } },
-    { id: 'dive', label: '深潜捕乌贼', hold: 5.5, view: { dist: 2.8, mobDist: 4.4, frameY: 40, track: true } },
-    { id: 'blow', label: '喷气换气', hold: 5 },
-    { id: 'click', label: '喀哒定位', hold: 5.5 },
+    { id: 'sleep', label: '垂直睡眠', hold: 6, rate: 0.5, view: { yaw: 1.15, pitch: 0.12, dist: 2.2, mobDist: 3.4, track: true } },
+    { id: 'dive', label: '深潜捕乌贼', hold: 5.5, rate: 1.1, view: { yaw: 0.8, dist: 2.8, mobDist: 4.4, frameY: 40, track: true } },
+    { id: 'blow', label: '喷气换气', hold: 5, rate: 1, view: { yaw: 0.5, pitch: 0.18, dist: 0.6 } },
+    { id: 'click', label: '喀哒定位', hold: 5.5, rate: 1.55, view: { yaw: 0.22, pitch: 0.1, dist: -0.8 } },
   ],
   leatherback: [
     { id: 'cruise', label: '长距洄游', hold: 6 },
@@ -151,20 +151,20 @@ export const BEHAVIORS = {
     { id: 'nest', label: '沙滩产卵', hold: 6 },
   ],
   giant_squid: [
-    { id: 'lunge', label: '长腕捕猎', hold: 5 },
-    { id: 'jet', label: '喷射推进', hold: 4.5 },
-    { id: 'duel', label: '对抗抹香鲸', hold: 6 },
+    { id: 'lunge', label: '长腕捕猎', hold: 5, view: { yaw: 0.35, pitch: 0.22, dist: 0.35 } },
+    { id: 'jet', label: '喷射推进', hold: 4.5, view: { yaw: 1.15, pitch: 0.05, dist: 1.2 } },
+    { id: 'duel', label: '对抗抹香鲸', hold: 6, view: { yaw: -0.4, pitch: 0.12, dist: 1.5 } },
   ],
   octopus: [
-    { id: 'camouflage', label: '变色伪装', hold: 5.5 },
-    { id: 'ink', label: '喷墨逃逸', hold: 4.5 },
-    { id: 'squeeze', label: '钻入缝隙', hold: 5.5 },
-    { id: 'probe', label: '腕尖探物', hold: 5 },
+    { id: 'camouflage', label: '变色伪装', hold: 5.5, view: { yaw: 0.25, pitch: 0.35, dist: -0.6 } },
+    { id: 'ink', label: '喷墨逃逸', hold: 4.5, view: { yaw: 1.05, pitch: 0.05, dist: 0.7 } },
+    { id: 'squeeze', label: '钻入缝隙', hold: 5.5, view: { yaw: 0.6, pitch: 0.4, dist: -0.35 } },
+    { id: 'probe', label: '腕尖探物', hold: 5, view: { yaw: -0.7, pitch: 0.18, dist: 0.15 } },
   ],
   lionsmane: [
-    { id: 'pulse', label: '伞体搏动', hold: 5.5 },
-    { id: 'trail', label: '触手拖网', hold: 6 },
-    { id: 'drift', label: '随流漂移', hold: 6.5 },
+    { id: 'pulse', label: '伞体搏动', hold: 5.5, view: { yaw: 0.2, pitch: 0.12, dist: -0.15 } },
+    { id: 'trail', label: '触手拖网', hold: 6, view: { yaw: 0.55, pitch: 0.38, dist: 0.5 } },
+    { id: 'drift', label: '随流漂移', hold: 6.5, view: { yaw: 1.05, pitch: 0.05, dist: 0.65 } },
   ],
   comb_jelly: [
     { id: 'shimmer', label: '栉板彩虹光', hold: 5.5 },
@@ -188,9 +188,9 @@ export const BEHAVIORS = {
     { id: 'fast', label: '长期禁食', hold: 7 },
   ],
   starfish: [
-    { id: 'crawl', label: '管足爬行', hold: 6 },
-    { id: 'evert', label: '翻胃进食', hold: 6 },
-    { id: 'regenerate', label: '断腕再生', hold: 7 },
+    { id: 'crawl', label: '管足爬行', hold: 6, view: { yaw: 0.4, pitch: 0.72, dist: -0.35 } },
+    { id: 'evert', label: '翻胃进食', hold: 6, view: { yaw: 0.15, pitch: 0.95, dist: -0.7 } },
+    { id: 'regenerate', label: '断腕再生', hold: 7, view: { yaw: 1.15, pitch: 0.48, dist: -0.15 } },
   ],
   urchin: [
     { id: 'spin', label: '棘刺转动', hold: 5.5 },

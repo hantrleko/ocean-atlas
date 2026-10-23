@@ -35,11 +35,11 @@ export const PRESETS = {
     hemi: [0xe8fbff, 0x6a7a50, 1.35], key: [0xfff2d0, 2.2], exposure: 1.05, amb: 'reef',
   },
   jelly: {
-    top: 0x2f7fd0, hor: 0x123f86, bot: 0x061a3e, fog: 0.032, surf: 0.4, sun: 0.4,
-    snow: 0xbfe6ff, snowOp: 0.65, specks: 0.35, speckCol: 0x9fdcff,
-    bed: 0, bedCol: 0x0a1a30, bedY: -6, bedTilt: 0, caus: 0, causCol: 0xffffff,
-    grass: 0, rocks: 0, rays: 0.45, water: 0, ceil: 0,
-    hemi: [0x9fd0ff, 0x0a1f40, 1.0], key: [0xd8ecff, 1.4], exposure: 1.0, amb: 'midwater', dark: 1,
+    top: 0x8fd4f2, hor: 0x3a96c4, bot: 0x145878, fog: 0.03, surf: 0.85, sun: 0.7,
+    snow: 0xe7f7ff, snowOp: 0.35, specks: 0.28, speckCol: 0xfff2c8,
+    bed: 0.45, bedCol: 0xc8b890, bedY: -2.25, bedTilt: 0, caus: 0.65, causCol: 0xfff6d8,
+    grass: 0.22, grassCol: 0x4a8a48, rocks: 0.28, rays: 0.55, water: 0, ceil: 0,
+    hemi: [0xe8fbff, 0x3a6070, 1.2], key: [0xfff4e0, 1.85], exposure: 1.04, amb: 'midwater',
   },
   physalia: {
     top: 0x3f8fdc, hor: 0xa9d3ee, bot: 0x0d3d66, fog: 0.011, surf: 0, sun: 0.9,
@@ -153,6 +153,20 @@ const ENV = {
     grass: 0.28, grassCol: 0x6aaa48, rocks: 0.95, rays: 0.65, water: 0, ceil: 0,
     hemi: [0xf4ffff, 0x8a7848, 1.45], key: [0xfff6d8, 2.35], exposure: 1.08, amb: 'surface',
   },
+  deep_ocean: {
+    top: 0x071422, hor: 0x061018, bot: 0x02060c, fog: 0.05, surf: 0.04, sun: 0.04,
+    snow: 0x8aa0b8, snowOp: 0.72, specks: 1, speckCol: 0x3ec8ff,
+    bed: 0, bedCol: 0x101820, bedY: -6, bedTilt: 0, caus: 0, causCol: 0xffffff,
+    grass: 0, rocks: 0, rays: 0.04, water: 0, ceil: 0,
+    hemi: [0x4a7098, 0x050810, 0.7], key: [0x9ab4d0, 0.95], exposure: 0.92, amb: 'abyss', dark: 1,
+  },
+  open_jelly: {
+    top: 0x5fc4f0, hor: 0x1f6ea8, bot: 0x07263f, fog: 0.026, surf: 1, sun: 1,
+    snow: 0xcfefff, snowOp: 0.28, specks: 0.55, speckCol: 0xffc0e0,
+    bed: 0, bedCol: 0x22465a, bedY: -6, bedTilt: 0, caus: 0, causCol: 0xbfefff,
+    grass: 0, rocks: 0, rays: 0.85, water: 0, ceil: 1, ceilY: 3.2,
+    hemi: [0xbfe8ff, 0x1a3c58, 1.28], key: [0xfff6e0, 1.7], exposure: 1.06, amb: 'open',
+  },
   kelp_forest: {
     top: 0x1f6a48, hor: 0x0e4634, bot: 0x08281e, fog: 0.04, surf: 0.45, sun: 0.55,
     snow: 0xd8f0e0, snowOp: 0.3, specks: 0.12, speckCol: 0xc8f0a0,
@@ -174,8 +188,8 @@ const SPECIES_ENV = {
   coelacanth: 'volcanic_cave',
   orca: 'polar_ice_edge',
   dolphin: 'sunlit_coastal',
-  sperm_whale: 'twilight_zone',
-  leatherback: 'jellyfish_bloom',
+  sperm_whale: 'deep_ocean',
+  leatherback: 'open_jelly',
   giant_squid: 'twilight_zone',
   octopus: 'rocky_reef',
   lionsmane: 'polar_ice_edge',
@@ -187,6 +201,26 @@ const SPECIES_ENV = {
   urchin: 'kelp_forest',
 };
 for (const [id, name] of Object.entries(SPECIES_ENV)) PRESETS[id] = ENV[name];
+
+/**
+ * Habitat bucket for each species. Visual preset `amb` follows the bucket:
+ * deep / benthic_deep → abyss, twilight → twilight, reef / benthic → reef,
+ * open → open, surface → surface, coastal → midwater or the coastal reef bed.
+ */
+export const HABITAT = {
+  dumbo: 'benthic_deep', angler: 'deep', vampire: 'deep', barreleye: 'deep', gulper: 'deep',
+  nautilus: 'twilight', jelly: 'coastal', physalia: 'surface', whale: 'open', turtle: 'reef',
+  hammer: 'reef', great_white: 'coastal', manta: 'reef', frilled_shark: 'twilight', oarfish: 'twilight',
+  clownfish: 'reef', seahorse: 'benthic', sunfish: 'open', blobfish: 'benthic_deep', coelacanth: 'benthic_deep',
+  orca: 'open', dolphin: 'coastal', sperm_whale: 'deep', leatherback: 'open', giant_squid: 'twilight',
+  octopus: 'reef', lionsmane: 'open', comb_jelly: 'twilight', spider_crab: 'benthic_deep',
+  mantis_shrimp: 'reef', giant_isopod: 'benthic_deep', starfish: 'benthic', urchin: 'benthic',
+};
+export const HABITAT_ZH = {
+  deep: '深海', twilight: '暮光带', reef: '浅海珊瑚礁', open: '开阔大洋',
+  surface: '海面', benthic: '近岸底栖', benthic_deep: '深海底栖', coastal: '近岸浅海',
+};
+export function habitatLabel(id) { return HABITAT_ZH[HABITAT[id]] || ''; }
 const NUM = ['fog', 'surf', 'sun', 'snowOp', 'specks', 'bed', 'bedY', 'bedTilt', 'caus', 'grass', 'rocks', 'rays', 'water', 'ceil', 'exposure', 'sky'];
 const COL = ['top', 'hor', 'bot', 'snow', 'speckCol', 'bedCol', 'causCol', 'grassCol'];
 
@@ -348,6 +382,17 @@ void main(){vec3 v=normalize(cameraPosition-vW);float fr=pow(1.-abs(v.y),3.);
     dumbo_crawl: () => emit(40, 0, st.bedY + .15, 0, 2),
     physalia_roll: () => emit(50, 0, (target.waterY ?? 0) + .05, 0, 0, .6),
     whale_lobtail: () => setTimeout(() => sid === 'whale' && emit(110, -1.6, ceilY, 0, 0, 1.5), 900),
+    great_white_breach: () => emit(120, 0, 1.15, 0, 0, 1.5),
+    orca_breach: () => emit(130, 0, 1.35, 0, 0, 1.5),
+    dolphin_leap: () => emit(80, 0, 1.15, 0, 0, 1.1),
+    manta_leap: () => emit(70, 0, 1.25, 0, 0, 1),
+    spider_crab_walk: () => emit(36, 0, st.bedY + .12, 0, 2, .8),
+    starfish_crawl: () => emit(24, 0, st.bedY + .08, 0, 2, .5),
+    urchin_tube: () => emit(20, 0, st.bedY + .08, 0, 2, .4),
+    mantis_shrimp_punch: () => emit(28, .35, st.bedY + .15, .2, 2, .7),
+    giant_isopod_scavenge: () => emit(26, 0, st.bedY + .1, 0, 2, .55),
+    octopus_ink: () => { burst = .8; emit(40, -.6, 0, .2, 1); },
+    giant_squid_jet: () => { burst = .7; emit(34, -.8, 0, .1, 1); },
   };
   function react(beh, cur, t, dt) {
     if (beh !== lastBeh) { lastBeh = beh; behT = t; ON[`${sid}_${beh}`]?.(); }
