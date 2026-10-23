@@ -32,7 +32,7 @@ const SFX = {
   hammer_pin: ['@thud', .6], hammer_scan: ['@ping', .3], hammer_sideswim: ['jet-whoosh', .4, .8, 0],
   great_white_breach: ['whale-breach', .75, 1.15, 0], great_white_bite: ['jaw-snap', .95, 1, .05], great_white_cruise: ['@ping', .2],
   manta_leap: ['whale-breach', .45, 1.3, 0], manta_glide: ['@hum', .25], manta_hover: ['bubbles', .3, 1.2, 0],
-  frilled_shark_strike: ['jaw-snap', .8, .85, .05], frilled_shark_snake: ['jet-whoosh', .35, .7, 0],
+  frilled_shark_lunge: ['jaw-snap', .8, .85, .05], frilled_shark_slither: ['jet-whoosh', .35, .7, 0],
   oarfish_dive: ['bubbles', .35, .7, 0], oarfish_dorsal: ['@hum', .3],
   clownfish_chase: ['jet-whoosh', .4, 1.3, 0], clownfish_fan: ['bubbles', .3, 1.4, 0],
   seahorse_snap: ['@ping', .3], seahorse_dance: ['@chime', .3], seahorse_brood: ['bubbles', .25, .9, 0],
