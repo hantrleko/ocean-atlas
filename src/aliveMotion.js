@@ -65,6 +65,28 @@ export const MOTION = {
     kind: 'shell', undulate: 0.012, freq: 1.0, bob: 0.1, yaw: 0.08, pitch: 0.06, roll: 0.1,
     behaviors: null,
   },
+  great_white: { kind: 'fish', undulate: 0.042, freq: 1.7, bob: 0.07, yaw: 0.14, pitch: 0.05, roll: 0.08, tailBias: 1, behaviors: null },
+  manta: { kind: 'fish', undulate: 0.028, freq: 1.05, bob: 0.08, yaw: 0.1, pitch: 0.06, roll: 0.05, tailBias: 0.4, behaviors: null },
+  frilled_shark: { kind: 'fish', undulate: 0.07, freq: 1.6, bob: 0.06, yaw: 0.12, pitch: 0.08, roll: 0.1, tailBias: 1, long: true, behaviors: null },
+  oarfish: { kind: 'fish', undulate: 0.05, freq: 1.15, bob: 0.05, yaw: 0.06, pitch: 0.04, roll: 0.05, tailBias: 1, long: true, behaviors: null },
+  clownfish: { kind: 'fish', undulate: 0.05, freq: 2.4, bob: 0.06, yaw: 0.18, pitch: 0.06, roll: 0.1, tailBias: 1, behaviors: null },
+  seahorse: { kind: 'fish', undulate: 0.018, freq: 1.3, bob: 0.07, yaw: 0.08, pitch: 0.05, roll: 0.06, behaviors: null },
+  sunfish: { kind: 'fish', undulate: 0.02, freq: 1.15, bob: 0.06, yaw: 0.08, pitch: 0.04, roll: 0.06, behaviors: null },
+  blobfish: { kind: 'soft', undulate: 0.04, freq: 0.9, bob: 0.05, yaw: 0.06, pitch: 0.05, roll: 0.06, behaviors: null },
+  coelacanth: { kind: 'fish', undulate: 0.032, freq: 1.25, bob: 0.05, yaw: 0.1, pitch: 0.05, roll: 0.07, tailBias: 1, behaviors: null },
+  orca: { kind: 'fish', undulate: 0.038, freq: 1.35, bob: 0.08, yaw: 0.12, pitch: 0.06, roll: 0.06, tailBias: 1, behaviors: null },
+  dolphin: { kind: 'fish', undulate: 0.045, freq: 1.8, bob: 0.08, yaw: 0.16, pitch: 0.07, roll: 0.08, tailBias: 1, behaviors: null },
+  sperm_whale: { kind: 'fish', undulate: 0.03, freq: 0.95, bob: 0.07, yaw: 0.08, pitch: 0.05, roll: 0.04, tailBias: 1, slow: true, behaviors: null },
+  leatherback: { kind: 'turtle', undulate: 0.02, freq: 1.35, bob: 0.06, yaw: 0.1, pitch: 0.06, roll: 0.1, behaviors: null },
+  giant_squid: { kind: 'soft', undulate: 0.05, freq: 1.2, bob: 0.08, yaw: 0.1, pitch: 0.08, roll: 0.08, long: true, behaviors: null },
+  octopus: { kind: 'soft', undulate: 0.055, freq: 1.35, bob: 0.07, yaw: 0.12, pitch: 0.08, roll: 0.1, behaviors: null },
+  lionsmane: { kind: 'jelly', undulate: 0.2, freq: 1.15, bob: 0.1, yaw: 0.04, pitch: 0.02, roll: 0.03, behaviors: null },
+  comb_jelly: { kind: 'jelly', undulate: 0.12, freq: 1.8, bob: 0.08, yaw: 0.06, pitch: 0.04, roll: 0.05, behaviors: null },
+  spider_crab: { kind: 'shell', undulate: 0.01, freq: 0.7, bob: 0.04, yaw: 0.05, pitch: 0.03, roll: 0.04, behaviors: null },
+  mantis_shrimp: { kind: 'shell', undulate: 0.016, freq: 1.6, bob: 0.04, yaw: 0.08, pitch: 0.04, roll: 0.05, behaviors: null },
+  giant_isopod: { kind: 'shell', undulate: 0.012, freq: 0.8, bob: 0.04, yaw: 0.05, pitch: 0.03, roll: 0.04, behaviors: null },
+  starfish: { kind: 'shell', undulate: 0.01, freq: 0.6, bob: 0.03, yaw: 0.04, pitch: 0.02, roll: 0.03, behaviors: null },
+  urchin: { kind: 'shell', undulate: 0.012, freq: 0.9, bob: 0.03, yaw: 0.05, pitch: 0.02, roll: 0.04, behaviors: null },
 };
 
 for (const k of Object.keys(MOTION)) MOTION[k].behaviors = behaviorsFor(k);
@@ -316,7 +338,7 @@ export function applyAliveMotion(root, speciesId) {
     const half = size.clone().multiplyScalar(0.5);
     let { lengthAxis, lateralAxis, upAxis } = axesFromSize(size);
     // Jelly is roughly spherical; force Y = dome-up so tentacles (below) stretch correctly
-    if (speciesId === 'jelly') {
+    if (speciesId === 'jelly' || speciesId === 'lionsmane' || speciesId === 'comb_jelly') {
       upAxis = 1;
       lengthAxis = size.x >= size.z ? 0 : 2;
       lateralAxis = lengthAxis === 0 ? 2 : 0;
@@ -354,7 +376,7 @@ const TAU = Math.PI * 2;
 const bumpW = (x, a, b) => (x <= a || x >= b) ? 0 : Math.sin(Math.PI * (x - a) / (b - a)) ** 2;
 /** Large species-specific rigid motion patterns. L = model length (raw units). */
 export function fxOffsets(fx, t, L) {
-  const o = { px: 0, py: 0, rx: 0, ry: 0, rz: 0, sx: 0, sy: 0, sz: 0 };
+  const o = { px: 0, py: 0, pz: 0, rx: 0, ry: 0, rz: 0, sx: 0, sy: 0, sz: 0 };
   if (!fx) return o;
   const P = fx.period || 3, m = fx.mag || 0, u = ((t / P) % 1 + 1) % 1, s = Math.sin(TAU * u);
   switch (fx.type) {
@@ -382,6 +404,9 @@ export function fxOffsets(fx, t, L) {
     case 'roll': { const c = bumpW(u, 0.1, 0.8); o.rx = m * c; o.py = -L * 0.05 * c; break; }
     case 'scan': o.ry = m * s; o.rz = -0.12; o.py = -L * 0.08; break;
     case 'pin': { const c = bumpW(u, 0.3, 0.75); o.rz = -0.9 * c; o.px = L * m * c; o.py = -L * m * 0.6 * c; break; }
+    case 'orbit': { const a = TAU * u; o.px = Math.cos(a) * L * m; o.pz = Math.sin(a) * L * m; o.ry = a; break; }
+    case 'spin': o.ry = TAU * u * (fx.turns || 1); break;
+    case 'flatten': { const c = bumpW(u, 0.15, 0.85); o.sy = -m * c; o.sx = o.sz = m * 0.35 * c; o.py = -L * 0.04 * c; break; }
   }
   return o;
 }
@@ -510,7 +535,7 @@ export function makeAliveUpdater(raw, speciesId, alive) {
     let bobMult;
     let swayMult;
 
-    const fx = { px: 0, py: 0, rx: 0, ry: 0, rz: 0, sx: 0, sy: 0, sz: 0 };
+    const fx = { px: 0, py: 0, pz: 0, rx: 0, ry: 0, rz: 0, sx: 0, sy: 0, sz: 0 };
     if (mode === 'auto' || !locked) {
       const { cur, nxt, e, id: sid } = sampleBehaviors(behaviors, t, phase); activeId = sid;
       addFx(fx, fxOffsets(cur.fx, t, L), 1 - e); addFx(fx, fxOffsets(nxt.fx, t, L), e);
@@ -548,7 +573,7 @@ export function makeAliveUpdater(raw, speciesId, alive) {
     const pitchW = Math.sin(t * 0.42 + phase * 1.3) * profile.pitch * 0.4 * swayMult;
     const rollW = Math.sin(t * 0.5 + phase * 0.7) * profile.roll * 0.35 * swayMult;
 
-    raw.position.set(fx.px, bob + fx.py, 0);
+    raw.position.set(fx.px, bob + fx.py, fx.pz);
     raw.rotation.x = pose[0] + pitchW + fx.rx;
     raw.rotation.y = pose[1] + yawW + fx.ry;
     raw.rotation.z = pose[2] + rollW + fx.rz;

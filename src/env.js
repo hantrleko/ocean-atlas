@@ -63,6 +63,130 @@ export const PRESETS = {
     hemi: [0xe0f8ff, 0x8a7a5a, 1.3], key: [0xfff2d8, 2.1], exposure: 1.05, amb: 'reef',
   },
 };
+
+/** Catalog environment name → visual preset. `amb` keys match audio.js. */
+const ENV = {
+  sunlit_coastal: {
+    top: 0x7ed4ee, hor: 0x2a90b4, bot: 0x166888, fog: 0.028, surf: 1, sun: 0.95,
+    snow: 0xeafcff, snowOp: 0.28, specks: 0.08, speckCol: 0xffffff,
+    bed: 1, bedCol: 0xd8c89a, bedY: -2.05, bedTilt: 0.05, caus: 1.15, causCol: 0xfff6d8,
+    grass: 0.18, grassCol: 0x6a9a48, rocks: 0.65, rays: 0.9, water: 0, ceil: 0,
+    hemi: [0xe7fbff, 0x8a7a58, 1.35], key: [0xfff3d8, 2.15], exposure: 1.06, amb: 'reef',
+  },
+  reef_cleaning_station: {
+    top: 0x5ec8ea, hor: 0x1f86b8, bot: 0x146888, fog: 0.03, surf: 0.85, sun: 0.9,
+    snow: 0xe7fbff, snowOp: 0.22, specks: 0.2, speckCol: 0xfff2a8,
+    bed: 1, bedCol: 0xd2c0a4, bedY: -1.9, bedTilt: 0, caus: 1.05, causCol: 0xfff4cc,
+    grass: 0.85, grassCol: 0x2f9a86, rocks: 1, rays: 0.75, water: 0, ceil: 0,
+    hemi: [0xe4fbff, 0x5a8870, 1.3], key: [0xfff6e4, 2.05], exposure: 1.05, amb: 'reef',
+  },
+  deep_slope: {
+    top: 0x12304e, hor: 0x0b1c32, bot: 0x060e18, fog: 0.046, surf: 0.1, sun: 0.12,
+    snow: 0x9eb4c8, snowOp: 0.55, specks: 0.45, speckCol: 0x6ec8ff,
+    bed: 1, bedCol: 0x2a3140, bedY: -1.85, bedTilt: 0.48, caus: 0.08, causCol: 0x88a0c0,
+    grass: 0.05, grassCol: 0x243040, rocks: 1.05, rays: 0.08, water: 0, ceil: 0,
+    hemi: [0x6a88b0, 0x101820, 0.8], key: [0xb8c8e0, 1.15], exposure: 0.95, amb: 'twilight', dark: 1,
+  },
+  twilight_zone: {
+    top: 0x102848, hor: 0x0a1830, bot: 0x050c18, fog: 0.04, surf: 0.15, sun: 0.18,
+    snow: 0xb7c8dc, snowOp: 0.62, specks: 0.9, speckCol: 0x4df2ff,
+    bed: 0, bedCol: 0x101820, bedY: -6, bedTilt: 0, caus: 0, causCol: 0xffffff,
+    grass: 0, rocks: 0, rays: 0.12, water: 0, ceil: 0,
+    hemi: [0x7aa0d0, 0x0a1424, 0.85], key: [0xc8d8f0, 1.2], exposure: 0.98, amb: 'twilight', dark: 1,
+  },
+  anemone_reef: {
+    top: 0x6fd0e0, hor: 0x2a88a8, bot: 0x1a6078, fog: 0.032, surf: 0.9, sun: 0.85,
+    snow: 0xfff0ea, snowOp: 0.22, specks: 0.15, speckCol: 0xffc2a0,
+    bed: 1, bedCol: 0xe4d0b0, bedY: -1.92, bedTilt: 0, caus: 1.1, causCol: 0xfff0d0,
+    grass: 1, grassCol: 0xd45a78, rocks: 0.75, rays: 0.7, water: 0, ceil: 0,
+    hemi: [0xfff4ee, 0x8a6858, 1.3], key: [0xffe4c8, 2.1], exposure: 1.05, amb: 'reef',
+  },
+  seagrass_meadow: {
+    top: 0x8fdef4, hor: 0x349cb8, bot: 0x24786e, fog: 0.034, surf: 1, sun: 1,
+    snow: 0xeafcff, snowOp: 0.22, specks: 0, speckCol: 0xffffff,
+    bed: 1, bedCol: 0xd4c49a, bedY: -1.9, bedTilt: 0, caus: 1.15, causCol: 0xfff6d0,
+    grass: 1, grassCol: 0x3f8a32, rocks: 0.25, rays: 0.85, water: 0, ceil: 0,
+    hemi: [0xe8fbff, 0x5a7a40, 1.35], key: [0xfff2d0, 2.15], exposure: 1.05, amb: 'reef',
+  },
+  sunlit_open_ocean: {
+    top: 0x5fc4f0, hor: 0x1f6ea8, bot: 0x07263f, fog: 0.026, surf: 1, sun: 1,
+    snow: 0xcfefff, snowOp: 0.28, specks: 0, speckCol: 0xffffff,
+    bed: 0, bedCol: 0x22465a, bedY: -6, bedTilt: 0, caus: 0, causCol: 0xbfefff,
+    grass: 0, rocks: 0, rays: 1, water: 0, ceil: 1, ceilY: 3.2,
+    hemi: [0xbfe8ff, 0x1a3c58, 1.28], key: [0xfff6e0, 1.7], exposure: 1.06, amb: 'open',
+  },
+  abyssal_plain: {
+    ...ABYSS, bed: 1, bedY: -2.15, bedTilt: 0, rocks: 0.2, grass: 0, speckCol: 0x7ec8ff, snowOp: 0.8,
+  },
+  volcanic_cave: {
+    top: 0x160e10, hor: 0x1c100c, bot: 0x070404, fog: 0.055, surf: 0, sun: 0.08,
+    snow: 0x8a6858, snowOp: 0.4, specks: 0.85, speckCol: 0xff6a2a,
+    bed: 1, bedCol: 0x1a1210, bedY: -1.65, bedTilt: 0.38, caus: 0, causCol: 0xff8844,
+    grass: 0, rocks: 1.15, rays: 0.05, water: 0, ceil: 0,
+    hemi: [0x6a4030, 0x100806, 0.7], key: [0xffa060, 0.85], exposure: 0.9, amb: 'abyss', dark: 1,
+  },
+  polar_ice_edge: {
+    top: 0xd4f6ff, hor: 0x8ec8e4, bot: 0x1a5270, fog: 0.022, surf: 0.7, sun: 0.75, sky: 0.22,
+    snow: 0xf4fbff, snowOp: 0.45, specks: 0.12, speckCol: 0xe8f7ff,
+    bed: 0.35, bedCol: 0xd5e4ee, bedY: -2.3, bedTilt: 0, caus: 0.35, causCol: 0xf4fbff,
+    grass: 0, rocks: 0.15, rays: 0.85, water: 0.35, waterY: 1.6, ceil: 0.55, ceilY: 2.6,
+    hemi: [0xf4fbff, 0x4a7890, 1.35], key: [0xf7fbff, 2.0], exposure: 1.08, amb: 'open',
+  },
+  jellyfish_bloom: {
+    top: 0x3a78c8, hor: 0x163868, bot: 0x071428, fog: 0.03, surf: 0.35, sun: 0.35,
+    snow: 0xd0e6ff, snowOp: 0.55, specks: 0.85, speckCol: 0xffb0e0,
+    bed: 0, bedCol: 0x0a1830, bedY: -6, bedTilt: 0, caus: 0, causCol: 0xffffff,
+    grass: 0, rocks: 0, rays: 0.4, water: 0, ceil: 0,
+    hemi: [0xc8d8ff, 0x101830, 1.0], key: [0xe8e0ff, 1.35], exposure: 1.0, amb: 'midwater', dark: 1,
+  },
+  rocky_reef: {
+    top: 0x3e86b8, hor: 0x1a5278, bot: 0x0e3048, fog: 0.036, surf: 0.55, sun: 0.55,
+    snow: 0xd0e4f0, snowOp: 0.35, specks: 0.15, speckCol: 0xb8e0c8,
+    bed: 1, bedCol: 0x6a645c, bedY: -1.85, bedTilt: 0.12, caus: 0.55, causCol: 0xfff0d0,
+    grass: 0.45, grassCol: 0x3a6a38, rocks: 1.15, rays: 0.4, water: 0, ceil: 0,
+    hemi: [0xd0e8f0, 0x3a4038, 1.1], key: [0xfff0dc, 1.7], exposure: 1.02, amb: 'reef',
+  },
+  tide_pool: {
+    top: 0xb6f3ff, hor: 0x4ec8dc, bot: 0x2a9aaa, fog: 0.03, surf: 0.8, sun: 1,
+    snow: 0xf4ffff, snowOp: 0.18, specks: 0.05, speckCol: 0xffffff,
+    bed: 1, bedCol: 0xe6d2a8, bedY: -1.5, bedTilt: 0, caus: 1.7, causCol: 0xfff8e0,
+    grass: 0.28, grassCol: 0x6aaa48, rocks: 0.95, rays: 0.65, water: 0, ceil: 0,
+    hemi: [0xf4ffff, 0x8a7848, 1.45], key: [0xfff6d8, 2.35], exposure: 1.08, amb: 'surface',
+  },
+  kelp_forest: {
+    top: 0x1f6a48, hor: 0x0e4634, bot: 0x08281e, fog: 0.04, surf: 0.45, sun: 0.55,
+    snow: 0xd8f0e0, snowOp: 0.3, specks: 0.12, speckCol: 0xc8f0a0,
+    bed: 1, bedCol: 0x8a7a58, bedY: -1.95, bedTilt: 0, caus: 0.7, causCol: 0xe8ffc0,
+    grass: 1, grassCol: 0x2f7a28, rocks: 0.55, rays: 0.8, water: 0, ceil: 0,
+    hemi: [0xd8f0c8, 0x1a3020, 1.05], key: [0xfff2d0, 1.55], exposure: 1.0, amb: 'reef', dark: 1,
+  },
+};
+
+const SPECIES_ENV = {
+  great_white: 'sunlit_coastal',
+  manta: 'reef_cleaning_station',
+  frilled_shark: 'deep_slope',
+  oarfish: 'twilight_zone',
+  clownfish: 'anemone_reef',
+  seahorse: 'seagrass_meadow',
+  sunfish: 'sunlit_open_ocean',
+  blobfish: 'abyssal_plain',
+  coelacanth: 'volcanic_cave',
+  orca: 'polar_ice_edge',
+  dolphin: 'sunlit_coastal',
+  sperm_whale: 'twilight_zone',
+  leatherback: 'jellyfish_bloom',
+  giant_squid: 'twilight_zone',
+  octopus: 'rocky_reef',
+  lionsmane: 'polar_ice_edge',
+  comb_jelly: 'twilight_zone',
+  spider_crab: 'deep_slope',
+  mantis_shrimp: 'rocky_reef',
+  giant_isopod: 'abyssal_plain',
+  starfish: 'tide_pool',
+  urchin: 'kelp_forest',
+};
+for (const [id, name] of Object.entries(SPECIES_ENV)) PRESETS[id] = ENV[name];
 const NUM = ['fog', 'surf', 'sun', 'snowOp', 'specks', 'bed', 'bedY', 'bedTilt', 'caus', 'grass', 'rocks', 'rays', 'water', 'ceil', 'exposure', 'sky'];
 const COL = ['top', 'hor', 'bot', 'snow', 'speckCol', 'bedCol', 'causCol', 'grassCol'];
 

@@ -167,11 +167,21 @@ hammer() {
   return { g, up: t => { tail.rotation.y = Math.sin(t * 2.2) * 0.35; body.rotation.y = Math.sin(t * 2.2) * 0.03; g.rotation.y = Math.sin(t * 2.2 + Math.PI) * 0.06; pecs.forEach((p, i) => p.rotation.x = (i ? -1 : 1) * Math.sin(t) * 0.12); g.position.y = Math.sin(t * 1.1) * 0.06; } };
 },
 };
-export function build(id) { const r = B[id](); const box = new THREE.Box3().setFromObject(r.g); const s = box.getSize(new THREE.Vector3()); const k = 3.3 / Math.max(s.x, s.y, s.z * 1.2); const c = box.getCenter(new THREE.Vector3()); const outer = new THREE.Group(); const inner = new THREE.Group(); inner.add(r.g); inner.scale.setScalar(k); inner.position.copy(c).multiplyScalar(-k); outer.add(inner); r.g.traverse(o => { if (o.isMesh) o.castShadow = true; }); const setMode = () => 'auto'; const getMode = () => 'auto'; r.up.setMode = setMode; r.up.getMode = getMode; return { g: outer, raw: r.g, up: r.up, setMode, getMode, k }; }
+function genericFallback() {
+  const g = new THREE.Group();
+  g.add(sph(0.55, S(0x6a8aa0), 1.15, 0.72, 0.85));
+  return { g, up: t => { g.position.y = Math.sin(t * 1.2) * 0.08; g.rotation.y = t * 0.25; } };
+}
+export function build(id) { const r = (B[id] || genericFallback)(); const box = new THREE.Box3().setFromObject(r.g); const s = box.getSize(new THREE.Vector3()); const k = 3.3 / Math.max(s.x, s.y, s.z * 1.2); const c = box.getCenter(new THREE.Vector3()); const outer = new THREE.Group(); const inner = new THREE.Group(); inner.add(r.g); inner.scale.setScalar(k); inner.position.copy(c).multiplyScalar(-k); outer.add(inner); r.g.traverse(o => { if (o.isMesh) o.castShadow = true; }); const setMode = () => 'auto'; const getMode = () => 'auto'; r.up.setMode = setMode; r.up.getMode = getMode; return { g: outer, raw: r.g, up: r.up, setMode, getMode, k }; }
 
 
 /** Species ids that prefer a GLB under /models/${id}.glb */
-export const GLB_IDS = new Set(['vampire','nautilus','dumbo','angler','barreleye','gulper','jelly','physalia','whale','turtle','hammer']);
+export const GLB_IDS = new Set([
+  'vampire','nautilus','dumbo','angler','barreleye','gulper','jelly','physalia','whale','turtle','hammer',
+  'great_white','manta','frilled_shark','oarfish','clownfish','seahorse','sunfish','blobfish','coelacanth',
+  'orca','dolphin','sperm_whale','leatherback','giant_squid','octopus','lionsmane','comb_jelly',
+  'spider_crab','mantis_shrimp','giant_isopod','starfish','urchin',
+]);
 
 /** Skinned + AnimationMixer GLBs (skip GPU aliveMotion to avoid double deform). */
 export const RIGGED_IDS = new Set(['angler', 'whale', 'turtle', 'dumbo', 'vampire', 'gulper', 'hammer']);
@@ -218,7 +228,13 @@ function fetchTemplate(id, onProgress) {
 }
 
 /** Approximate compressed sizes (bytes) — progress fallback when the server omits Content-Length. */
-const MODEL_BYTES = { angler: 466e3, barreleye: 296e3, dumbo: 541e3, gulper: 563e3, hammer: 373e3, jelly: 250e3, nautilus: 445e3, physalia: 312e3, turtle: 607e3, vampire: 711e3, whale: 480e3 };
+const MODEL_BYTES = {
+  angler: 466e3, barreleye: 296e3, dumbo: 541e3, gulper: 563e3, hammer: 373e3, jelly: 250e3, nautilus: 445e3, physalia: 312e3, turtle: 607e3, vampire: 711e3, whale: 480e3,
+  great_white: 1068104, manta: 731716, frilled_shark: 1438908, oarfish: 938264, clownfish: 1247940, seahorse: 1121064,
+  sunfish: 1067440, blobfish: 1077188, coelacanth: 1137408, orca: 749472, dolphin: 920060, sperm_whale: 1147504,
+  leatherback: 1703944, giant_squid: 1371692, octopus: 1094108, lionsmane: 1793540, comb_jelly: 1801404,
+  spider_crab: 1385128, mantis_shrimp: 1703048, giant_isopod: 1716572, starfish: 1798284, urchin: 1134528,
+};
 
 /** Warm the cache for a species in the background (no-op on Save-Data / slow connections). */
 export function prefetchCreature(id) {

@@ -3,7 +3,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { SPECIES } from './species.js';
+import { SPECIES, GROUPS } from './species.js';
 import { build, glowMats, loadCreature, prefetchCreature, isCached } from './creatures.js';
 import { uniqueBehaviors, behaviorLabel } from './aliveMotion.js';
 import { createEnv } from './env.js';
@@ -97,25 +97,74 @@ const flights = [];
 const THUMB = {
   dumbo: '#f0a28c', angler: '#5a4a50', vampire: '#8a1f2c', barreleye: '#3b3f48',
   gulper: '#1c1a22', nautilus: '#c4a574', jelly: '#b8d4e8', physalia: '#4a8fd4',
-  whale: '#5a6a78', turtle: '#7d8a5a', hammer: '#8e9aa6'
+  whale: '#5a6a78', turtle: '#7d8a5a', hammer: '#8e9aa6',
+  great_white: '#9aa8b4', manta: '#3d7ea8', frilled_shark: '#5c4a58', oarfish: '#c45a4a',
+  clownfish: '#e07a2f', seahorse: '#d4a24a', sunfish: '#8aa0b0', blobfish: '#c9a0b0',
+  coelacanth: '#4a6a62', orca: '#1c1c1c', dolphin: '#7aa0b8', sperm_whale: '#6a5a58',
+  leatherback: '#2a3a48', giant_squid: '#b85a4a', octopus: '#c46a4a', lionsmane: '#d4783a',
+  comb_jelly: '#e8b0d8', spider_crab: '#a05030', mantis_shrimp: '#2fa87a', giant_isopod: '#8a7a68',
+  starfish: '#d4783a', urchin: '#7a3a78',
 };
 
+/** '' = 全部物种；否则为 GROUPS id。点击当前科目会在组内轮换。 */
+let groupFilter = '';
+
+function groupById(id) { return GROUPS.find(g => g.id === id); }
+
+function indicesOf(gid) {
+  const out = [];
+  SPECIES.forEach((s, i) => { if (!gid || s.group === gid) out.push(i); });
+  return out;
+}
+
+function renderCarousel() {
+  $('#carousel').innerHTML = indicesOf(groupFilter).map(i => {
+    const s = SPECIES[i];
+    return `<div class="card" data-i="${i}"><span class="thumb" style="--t:${THUMB[s.id] || '#8899aa'}"></span><b>${s.name}</b><i>${s.latin}</i></div>`;
+  }).join('');
+}
+
+function markNav() {
+  document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('on', (a.dataset.g || '') === groupFilter));
+  document.querySelectorAll('#carousel .card').forEach(c => c.classList.toggle('on', +c.dataset.i === idx));
+  document.querySelector('#carousel .card.on')?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+}
+
+/** 搜索或精选跳到别的科目时，把轮播切到该物种所在的组，避免卡片不在列表里。 */
+function ensureGroup(i) {
+  const g = SPECIES[i].group;
+  if (groupFilter && g !== groupFilter) {
+    groupFilter = g;
+    renderCarousel();
+  }
+}
+
 function navBuild() {
-  const groups = {}; SPECIES.forEach((s, i) => (groups[s.nav] ??= []).push(i));
-  const order = ['首页', '精选', '鮟鱇鱼', '章鱼', '鱿鱼', '水母', '鲨鱼', '管水母'];
-  $('#nav').innerHTML = order.map(n =>
-    `<a data-n="${n}">${n}<i>${n === '首页' ? '' : n === '精选' ? (groups[n]?.length || 0) : (groups[n] ? SPECIES[groups[n][0]].en.split(' ').pop() : '')}</i></a>`
-  ).join('');
+  const start = +(new URLSearchParams(location.search).get('s') || 0);
+  groupFilter = SPECIES[start]?.group || GROUPS[0].id;
+  const counts = {};
+  SPECIES.forEach(s => { counts[s.group] = (counts[s.group] || 0) + 1; });
+  $('#nav').innerHTML =
+    `<a data-g="" title="全部物种"><b>全部</b><i>${SPECIES.length}</i></a>` +
+    GROUPS.map(g => `<a data-g="${g.id}" title="${g.latin} · ${g.note}"><b>${g.zh}</b><i>${counts[g.id] || 0}</i></a>`).join('');
   $('#nav').onclick = e => {
     const a = e.target.closest('a'); if (!a) return;
-    const n = a.dataset.n;
-    if (n === '首页') return select(0);
-    select(groups[n][n === '精选' ? (groups[n].indexOf(idx) + 1) % groups[n].length : 0]);
+    const g = a.dataset.g || '';
+    if (g === groupFilter) {
+      if (!g) return;
+      const idxs = indicesOf(g);
+      const pos = Math.max(0, idxs.indexOf(idx));
+      select(idxs[(pos + 1) % idxs.length]);
+      return;
+    }
+    groupFilter = g;
+    renderCarousel();
+    const idxs = indicesOf(g);
+    if (g && idxs.length && !idxs.includes(idx)) select(idxs[0]);
+    else markNav();
   };
-  $('#carousel').innerHTML = SPECIES.map((s, i) =>
-    `<div class="card" data-i="${i}"><span class="thumb" style="--t:${THUMB[s.id] || '#8899aa'}"></span><b>${s.name}</b><i>${s.latin}</i></div>`
-  ).join('');
   $('#carousel').onclick = e => { const c = e.target.closest('.card'); c && select(+c.dataset.i); };
+  renderCarousel();
   const f = SPECIES[3];
   $('#featName').textContent = f.name; $('#featLatin').textContent = f.latin;
   $('#featCap').textContent = f.caption; $('#featGo').onclick = () => select(3);
@@ -156,7 +205,8 @@ $('#actions')?.addEventListener('click', e => {
 function info(s) {
   const el = $('#info'); el.classList.remove('swap'); void el.offsetWidth; el.classList.add('swap');
   setTimeout(() => {
-    $('#fam').textContent = s.family; $('#title').textContent = s.name;
+    const g = groupById(s.group);
+    $('#fam').textContent = g ? `${g.zh} · ${s.family}` : s.family; $('#title').textContent = s.name;
     $('#latin').textContent = `${s.latin} · ${s.en}`;
     $('#tags').innerHTML = s.tags.map(t => `<span>${t}</span>`).join('');
     $('#desc').textContent = s.desc;
@@ -164,15 +214,14 @@ function info(s) {
     $('#dTitle').textContent = s.detail.title; $('#dText').textContent = s.detail.text;
     $('#caption').textContent = s.caption;
   }, 240);
-  document.querySelectorAll('.card').forEach((c, i) => c.classList.toggle('on', i === idx));
-  document.querySelector('.card.on')?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-  document.querySelectorAll('nav a').forEach(a => a.classList.toggle('on', a.dataset.n === s.nav || (a.dataset.n === '首页' && false)));
+  markNav();
 }
 
 async function select(i, instant) {
   if (cur && i === idx && !instant) return;
   idx = i;
   const s = SPECIES[i];
+  ensureGroup(i);
   const token = ++loadToken;
   actionMode = 'auto';
   rebuildActions(s.id);
@@ -322,9 +371,11 @@ addEventListener('keydown', e => {
 
 // search
 const q = $('#q'), res = $('#results');
-const match = v => SPECIES.map((s, i) => [s, i]).filter(([s]) =>
-  v && (s.name + s.latin + s.en + s.tags.join('')).toLowerCase().includes(v.toLowerCase())
-);
+const match = v => SPECIES.map((s, i) => [s, i]).filter(([s]) => {
+  const g = groupById(s.group);
+  const hay = (s.name + s.latin + s.en + s.nav + s.tags.join('') + (g ? g.zh + g.note : '')).toLowerCase();
+  return v && hay.includes(v.toLowerCase());
+});
 q.oninput = () => {
   const m = match(q.value.trim());
   res.style.display = m.length ? 'block' : 'none';
