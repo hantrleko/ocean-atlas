@@ -238,10 +238,10 @@ function fetchTemplate(id, onProgress) {
 /** Approximate compressed sizes (bytes) — progress fallback when the server omits Content-Length. */
 const MODEL_BYTES = {
   angler: 466e3, barreleye: 296e3, dumbo: 541e3, gulper: 563e3, hammer: 373e3, jelly: 250e3, nautilus: 445e3, physalia: 312e3, turtle: 607e3, vampire: 711e3, whale: 480e3,
-  great_white: 1705576, manta: 1297932, frilled_shark: 2351492, oarfish: 1614508, clownfish: 1959668, seahorse: 1924604,
+  great_white: 1705576, manta: 1297932, frilled_shark: 2351492, oarfish: 1614508, clownfish: 1959668, seahorse: 1931980,
   sunfish: 1720144, blobfish: 1808484, coelacanth: 1751404, orca: 1344704, dolphin: 1576744, sperm_whale: 1868988,
-  leatherback: 2662552, giant_squid: 2210896, octopus: 1963744, lionsmane: 3260888, comb_jelly: 3109988,
-  spider_crab: 2454764, mantis_shrimp: 2889640, giant_isopod: 3105960, starfish: 2854656, urchin: 2140244,
+  leatherback: 2662552, giant_squid: 2212908, octopus: 1969256, lionsmane: 3260888, comb_jelly: 3109988,
+  spider_crab: 2454764, mantis_shrimp: 2889640, giant_isopod: 3105960, starfish: 2855076, urchin: 2140244,
 };
 
 /** Warm the cache for a species in the background (no-op on Save-Data / slow connections). */
@@ -394,8 +394,9 @@ function clipForBehavior(id, behaviorId, clips) {
 const _ea = new THREE.Euler();
 const _qa = new THREE.Quaternion();
 
-/** Extra local bone motion so near-identical GLB clips read as different tabs. */
+/** Extra local bone motion where a clip is still quiet. Seahorse / octopus / squid / starfish use their exported clips. */
 function accentPose(raw, id, beh, t) {
+  if (id !== 'sperm_whale') return;
   if (!raw.userData.boneMap) {
     const map = {};
     raw.traverse(o => { if (o.isBone) map[o.name] = o; });
@@ -408,28 +409,7 @@ function accentPose(raw, id, beh, t) {
     _qa.setFromEuler(_ea);
     node.quaternion.multiply(_qa);
   };
-  if (id === 'seahorse') {
-    if (beh === 'grip') {
-      ['tail1', 'tail2', 'tail3', 'tail4', 'tail5'].forEach((n, i) => {
-        const k = (i + 1) / 5;
-        mul(b[n], 0, 0, 1.2 * k);
-      });
-    } else if (beh === 'brood') {
-      const p = b.pouch;
-      if (p) {
-        const s = 1 + 0.5 * (0.5 + 0.5 * Math.sin(t * 1.7));
-        p.scale.set(s, s * 1.2, s);
-      }
-      mul(b.abdomen, 0.18 * Math.sin(t * 1.7), 0, 0);
-    } else if (beh === 'sip') {
-      const jab = Math.max(0, Math.sin(t * 8)) ** 2;
-      mul(b.head, -0.75 * jab, 0.12 * Math.sin(t * 8), 0);
-      mul(b.snout, -1.15 * jab, 0, 0);
-      mul(b.neck, -0.4 * jab, 0, 0);
-    } else if (beh === 'dance') {
-      mul(b.root, 0, 0.5 * Math.sin(t * 1.6), 0.28 * Math.sin(t * 3.2));
-    }
-  } else if (id === 'sperm_whale' && beh === 'click') {
+  if (beh === 'click') {
     const k = 0.5 + 0.5 * Math.sin(t * 16);
     mul(b.jaw, 0.32 * k, 0, 0);
     mul(b.head, 0.05 * Math.sin(t * 16), 0.1 * Math.sin(t * 8), 0);
