@@ -171,30 +171,31 @@ export const BEHAVIORS = {
     { id: 'gulp', label: '吞食其他栉水母', hold: 5 },
     { id: 'cruise', label: '张口游动', hold: 5.5 },
   ],
+  // ---- batch 5 rigged clips (id === Blender AnimationClip name) ----
   spider_crab: [
-    { id: 'walk', label: '缓步爬行', hold: 6.5, pose: [0.32, 0, 0], amp: 0.55, freq: 0.6, bob: 0.45, sway: 0.55, fx: { type: 'sweep', period: 4.4, mag: 0.16 } },
-    { id: 'molt', label: '蜕壳', hold: 5.5, pose: [0, 0, 0], amp: 0.6, freq: 0.6, bob: 0.5, sway: 0.45, fx: { type: 'pulse', period: 3.6, mag: 0.22 } },
-    { id: 'dress', label: '附着伪装', hold: 6, pose: [0.2, 0, 0], amp: 0.5, freq: 0.55, bob: 0.45, sway: 0.45, fx: { type: 'sink', period: 6, mag: 0.1 } },
+    { id: 'walk', label: '缓步爬行', hold: 6 },
+    { id: 'molt', label: '蜕壳', hold: 6.5 },
+    { id: 'cloak', label: '附着伪装', hold: 5.5 },
   ],
   mantis_shrimp: [
-    { id: 'punch', label: '弹击碎壳', hold: 3.6, pose: [0.05, 0, 0], amp: 0.8, freq: 1.4, bob: 0.45, sway: 0.45, fx: { type: 'jet', period: 0.95, mag: 0.72 } },
-    { id: 'guard', label: '洞口守候', hold: 6, pose: [0.22, 0.15, 0], amp: 0.55, freq: 0.6, bob: 0.45, sway: 0.5, fx: { type: 'scan', period: 2.6, mag: 0.4 } },
-    { id: 'court', label: '彩色求偶', hold: 5.5, pose: [0, 0.2, 0.15], amp: 1.2, freq: 1.3, bob: 0.8, sway: 1, fx: { type: 'orbit', period: 4, mag: 0.14 } },
+    { id: 'punch', label: '弹击碎壳', hold: 5 },
+    { id: 'guard', label: '洞口守候', hold: 6 },
+    { id: 'display', label: '彩色求偶', hold: 6 },
   ],
   giant_isopod: [
-    { id: 'ball', label: '卷成球', hold: 5, pose: [0.2, 0, 0], amp: 0.55, freq: 0.55, bob: 0.45, sway: 0.45, fx: { type: 'curl', period: 3.2, mag: 0.95 } },
-    { id: 'scavenge', label: '食腐', hold: 6, pose: [0.48, 0, 0], amp: 0.6, freq: 0.65, bob: 0.45, sway: 0.5, fx: { type: 'scan', period: 3.1, mag: 0.48 } },
-    { id: 'fast', label: '长期禁食', hold: 7, pose: [0, 0, 0], amp: 0.5, freq: 0.55, bob: 0.45, sway: 0.45, fx: { type: 'finpaddle', period: 6.5, mag: 0.025 } },
+    { id: 'ball', label: '卷成球', hold: 6 },
+    { id: 'scavenge', label: '食腐', hold: 6 },
+    { id: 'fast', label: '长期禁食', hold: 7 },
   ],
   starfish: [
-    { id: 'tube', label: '管足爬行', hold: 6.5, pose: [0.12, 0, 0], amp: 0.5, freq: 0.55, bob: 0.45, sway: 0.5, fx: { type: 'sweep', period: 6.2, mag: 0.11 } },
-    { id: 'stomach', label: '翻胃进食', hold: 5.5, pose: [0, 0, 0], amp: 0.6, freq: 0.6, bob: 0.45, sway: 0.45, fx: { type: 'pulse', period: 3.2, mag: 0.26 } },
-    { id: 'regen', label: '断腕再生', hold: 5.5, pose: [0.05, 0, 0.1], amp: 0.55, freq: 0.55, bob: 0.45, sway: 0.45, fx: { type: 'retract', period: 4, mag: 0.28 } },
+    { id: 'crawl', label: '管足爬行', hold: 6 },
+    { id: 'evert', label: '翻胃进食', hold: 6 },
+    { id: 'regenerate', label: '断腕再生', hold: 7 },
   ],
   urchin: [
-    { id: 'spines', label: '棘刺转动', hold: 5.5, pose: [0, 0, 0], amp: 0.55, freq: 0.7, bob: 0.45, sway: 0.45, fx: { type: 'spin', period: 4, mag: 0.15, turns: 1 } },
-    { id: 'graze', label: '啃食海藻', hold: 6, pose: [0.28, 0, 0], amp: 0.55, freq: 0.6, bob: 0.45, sway: 0.45, fx: { type: 'scan', period: 3.2, mag: 0.32 } },
-    { id: 'tube', label: '管足移动', hold: 6, pose: [0.08, 0, 0], amp: 0.55, freq: 0.6, bob: 0.5, sway: 0.55, fx: { type: 'sweep', period: 5.2, mag: 0.18 } },
+    { id: 'spin', label: '棘刺转动', hold: 5.5 },
+    { id: 'graze', label: '啃食海藻', hold: 6 },
+    { id: 'tube', label: '管足移动', hold: 6 },
   ],
 };
 

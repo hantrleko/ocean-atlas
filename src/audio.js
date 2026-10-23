@@ -48,10 +48,10 @@ const SFX = {
   lionsmane_pulse: ['@pulse', .4], lionsmane_drift: ['@hum', .25],
   comb_jelly_shimmer: ['@chime', .28], comb_jelly_gulp: ['@pulse', .3],
   spider_crab_walk: ['@thud', .3], spider_crab_molt: ['@crunch', .35],
-  mantis_shrimp_punch: ['@thud', .85], mantis_shrimp_court: ['@chime', .35],
+  mantis_shrimp_punch: ['@thud', .85], mantis_shrimp_display: ['@chime', .35],
   giant_isopod_ball: ['@thud', .4], giant_isopod_scavenge: ['@crunch', .3],
-  starfish_stomach: ['@crunch', .25], starfish_tube: ['bubbles', .2, .7, 0],
-  urchin_graze: ['@crunch', .4], urchin_spines: ['@ping', .2],
+  starfish_evert: ['@crunch', .25], starfish_crawl: ['bubbles', .2, .7, 0],
+  urchin_graze: ['@crunch', .4], urchin_spin: ['@ping', .2],
 };
 const SPLASH = 'whale-breach';
 const filesFor = sp => [...new Set(Object.entries(SFX).filter(([k, v]) => k.startsWith(sp + '_') && !v[0].startsWith('@')).map(([, v]) => v[0]).concat(sp === 'whale' ? [SPLASH] : []))];
