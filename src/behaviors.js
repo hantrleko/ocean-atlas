@@ -75,19 +75,20 @@ export const BEHAVIORS = {
     { id: 'pin', label: '锤头压魟', hold: 5, pose: [0, 0, 0], amp: 1.7, freq: 1.8, bob: 0.4, sway: 0.4, fx: { type: 'pin', period: 2.6, mag: 0.4 } },
     { id: 'sideswim', label: '侧身游弋', hold: 6, pose: [0, 0, 1.1], amp: 1, freq: 0.9, bob: 0.8, sway: 0.6, fx: { type: 'sweep', period: 6, mag: 0.25 } },
   ],
-  // ---- Tripo static GLBs: species-specific labels, procedural fx (no Blender clips) ----
+  // ---- batch 1 rigged clips (id === Blender AnimationClip name) ----
   great_white: [
-    { id: 'breach', label: '突袭跃身', hold: 4.2, pose: [0.25, 0, 0], amp: 1.7, freq: 1.5, bob: 0.7, sway: 0.6, fx: { type: 'riseStrike', period: 2.2, mag: 0.62 } },
-    { id: 'circle', label: '巡游绕圈', hold: 6.5, pose: [0, 0, 0.12], amp: 1.05, freq: 1, bob: 0.8, sway: 1, fx: { type: 'orbit', period: 7, mag: 0.2 } },
-    { id: 'bite', label: '张口咬合', hold: 4.2, pose: [0.05, 0, 0], amp: 0.8, freq: 0.9, bob: 0.5, sway: 0.5, fx: { type: 'gape', period: 2.1, mag: 0.42 } },
-    { id: 'rolleye', label: '侧翻露眼', hold: 5, pose: [0, 0, 1.05], amp: 0.9, freq: 0.85, bob: 0.7, sway: 0.6, fx: { type: 'roll', period: 4.2, mag: 1.15 } },
+    { id: 'breach', label: '突袭跃身', hold: 5, view: { dist: 3.2, mobDist: 5.2, frameY: 80, track: true } },
+    { id: 'cruise', label: '巡游绕圈', hold: 6 },
+    { id: 'bite', label: '张口咬合', hold: 5 },
+    { id: 'roll', label: '侧翻露眼', hold: 5 },
   ],
   manta: [
-    { id: 'glide', label: '展翼滑翔', hold: 6, pose: [0.06, 0, 0], amp: 0.65, freq: 0.75, bob: 0.9, sway: 1.1, fx: { type: 'sweep', period: 6.5, mag: 0.32 } },
-    { id: 'barrel', label: '翻滚滤食', hold: 5, pose: [0, 0, 0], amp: 0.8, freq: 1, bob: 0.6, sway: 0.5, fx: { type: 'roll', period: 3.2, mag: 1.45 } },
-    { id: 'hover', label: '清洁站悬停', hold: 6, pose: [0, 0, 0], amp: 0.5, freq: 0.6, bob: 0.45, sway: 0.45, fx: { type: 'finpaddle', period: 2.4, mag: 0.05 } },
-    { id: 'leap', label: '跃出水面', hold: 4.2, pose: [-0.15, 0, 0], amp: 1.2, freq: 1.3, bob: 0.6, sway: 0.5, fx: { type: 'rise', period: 3, mag: 0.55 } },
+    { id: 'glide', label: '展翼滑翔', hold: 6 },
+    { id: 'barrel', label: '翻滚滤食', hold: 5 },
+    { id: 'hover', label: '清洁站悬停', hold: 6 },
+    { id: 'leap', label: '跃出水面', hold: 5.5, view: { dist: 3.4, mobDist: 5.4, frameY: 90, track: true } },
   ],
+  // ---- remaining Tripo static GLBs: procedural fx (no Blender clips) ----
   frilled_shark: [
     { id: 'snake', label: '蛇形游动', hold: 6, pose: [0, 0, 0.15], amp: 1.8, freq: 1.35, bob: 0.8, sway: 1.3, fx: { type: 'sweep', period: 3.2, mag: 0.5 } },
     { id: 'strike', label: '弹射咬捕', hold: 4, pose: [0.1, 0, 0], amp: 1.4, freq: 1.8, bob: 0.5, sway: 0.5, fx: { type: 'jet', period: 1.35, mag: 0.55 } },
@@ -125,16 +126,16 @@ export const BEHAVIORS = {
     { id: 'cave', label: '洞穴休憩', hold: 6.5, pose: [0.12, 0, 0], amp: 0.5, freq: 0.55, bob: 0.45, sway: 0.45, fx: { type: 'sink', period: 7, mag: 0.12 } },
   ],
   orca: [
-    { id: 'wash', label: '浪推海豹', hold: 5, pose: [0.15, 0, 0.2], amp: 1.1, freq: 1.1, bob: 1.2, sway: 0.8, fx: { type: 'waves', period: 2.3, mag: 0.22 } },
-    { id: 'pod', label: '群体围猎', hold: 6, pose: [0, 0, 0], amp: 1.35, freq: 1.25, bob: 0.7, sway: 1, fx: { type: 'orbit', period: 5.2, mag: 0.26 } },
-    { id: 'breach', label: '鲸跃', hold: 4.2, pose: [0.2, 0, 0], amp: 1.4, freq: 1.4, bob: 0.6, sway: 0.5, fx: { type: 'riseStrike', period: 2.3, mag: 0.6 } },
-    { id: 'spy', label: '浮窥', hold: 5, pose: [-0.55, 0, 0], amp: 0.6, freq: 0.7, bob: 0.5, sway: 0.45, fx: { type: 'rise', period: 3.6, mag: 0.38 } },
+    { id: 'wavewash', label: '浪推海豹', hold: 5 },
+    { id: 'hunt', label: '群体围猎', hold: 5 },
+    { id: 'breach', label: '鲸跃', hold: 5, view: { dist: 3.2, mobDist: 5.2, frameY: 100, track: true } },
+    { id: 'spyhop', label: '浮窥', hold: 6, view: { pitch: 0.12, dist: 1.8, mobDist: 2.6, track: true } },
   ],
   dolphin: [
-    { id: 'leap', label: '跃出水面', hold: 4, pose: [-0.1, 0, 0], amp: 1.4, freq: 1.5, bob: 0.7, sway: 0.7, fx: { type: 'rise', period: 2.1, mag: 0.55 } },
-    { id: 'surf', label: '乘浪冲浪', hold: 5.5, pose: [0, 0, 0.15], amp: 1.1, freq: 1.15, bob: 1.4, sway: 1, fx: { type: 'waves', period: 2, mag: 0.26 } },
-    { id: 'echo', label: '回声定位', hold: 5.5, pose: [0.18, 0.35, 0], amp: 0.8, freq: 0.9, bob: 0.55, sway: 0.7, fx: { type: 'sweep', period: 3.2, mag: 0.4 } },
-    { id: 'rings', label: '泡泡环', hold: 5, pose: [0, 0, 0], amp: 0.9, freq: 1, bob: 0.8, sway: 0.6, fx: { type: 'pulse', period: 1.6, mag: 0.16 } },
+    { id: 'leap', label: '跃出水面', hold: 4.5, view: { dist: 3.0, mobDist: 4.8, frameY: 80, track: true } },
+    { id: 'surf', label: '乘浪冲浪', hold: 5 },
+    { id: 'echolocate', label: '回声定位', hold: 5.5 },
+    { id: 'bubble', label: '泡泡环', hold: 5 },
   ],
   sperm_whale: [
     { id: 'sleep', label: '垂直睡眠', hold: 7, pose: [1.35, 0, 0], amp: 0.5, freq: 0.55, bob: 0.45, sway: 0.45, fx: { type: 'sink', period: 8, mag: 0.06 } },
