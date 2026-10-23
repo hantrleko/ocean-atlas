@@ -190,6 +190,7 @@ export const RIGGED_IDS = new Set([
   'frilled_shark', 'sperm_whale', 'leatherback', 'clownfish',
   'seahorse', 'sunfish', 'blobfish', 'coelacanth',
   'oarfish', 'giant_squid', 'octopus', 'lionsmane', 'comb_jelly',
+  'spider_crab', 'mantis_shrimp', 'giant_isopod', 'starfish', 'urchin',
 ]);
 
 const _tv = new THREE.Vector3();
@@ -239,7 +240,7 @@ const MODEL_BYTES = {
   great_white: 1705576, manta: 1297932, frilled_shark: 2351492, oarfish: 1614508, clownfish: 1959668, seahorse: 1924604,
   sunfish: 1720144, blobfish: 1808484, coelacanth: 1751404, orca: 1344704, dolphin: 1576744, sperm_whale: 1868988,
   leatherback: 2662552, giant_squid: 2210896, octopus: 1963744, lionsmane: 3260888, comb_jelly: 3109988,
-  spider_crab: 1385128, mantis_shrimp: 1703048, giant_isopod: 1716572, starfish: 1798284, urchin: 1134528,
+  spider_crab: 2454764, mantis_shrimp: 2889640, giant_isopod: 3105960, starfish: 2854656, urchin: 2140244,
 };
 
 /** Warm the cache for a species in the background (no-op on Save-Data / slow connections). */
