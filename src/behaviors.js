@@ -113,7 +113,7 @@ export const BEHAVIORS = {
     { id: 'dance', label: '求偶共舞', hold: 5.5 },
   ],
   sunfish: [
-    { id: 'bask', label: '侧躺晒日', hold: 6 },
+    { id: 'bask', label: '侧躺晒日', hold: 6, view: { yaw: 0.4, pitch: 0.12 } },
     { id: 'stroke', label: '背臀鳍划水', hold: 5 },
     { id: 'dive', label: '深潜觅食', hold: 5.5 },
   ],
