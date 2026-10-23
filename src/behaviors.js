@@ -98,7 +98,7 @@ export const BEHAVIORS = {
   oarfish: [
     { id: 'hover', label: '垂直悬立', hold: 6 },
     { id: 'undulate', label: '背鳍波动', hold: 5.5 },
-    { id: 'dive', label: '急速下潜', hold: 5.5 },
+    { id: 'dive', label: '急速下潜', hold: 5.5, view: { track: true } },
   ],
   clownfish: [
     { id: 'nestle', label: '钻进海葵', hold: 5 },
