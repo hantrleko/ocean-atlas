@@ -88,21 +88,22 @@ export const BEHAVIORS = {
     { id: 'hover', label: '清洁站悬停', hold: 6 },
     { id: 'leap', label: '跃出水面', hold: 5.5, view: { dist: 3.4, mobDist: 5.4, frameY: 90, track: true } },
   ],
-  // ---- remaining Tripo static GLBs: procedural fx (no Blender clips) ----
+  // ---- batch 2 rigged clips (id === Blender AnimationClip name) ----
   frilled_shark: [
-    { id: 'snake', label: '蛇形游动', hold: 6, pose: [0, 0, 0.15], amp: 1.8, freq: 1.35, bob: 0.8, sway: 1.3, fx: { type: 'sweep', period: 3.2, mag: 0.5 } },
-    { id: 'strike', label: '弹射咬捕', hold: 4, pose: [0.1, 0, 0], amp: 1.4, freq: 1.8, bob: 0.5, sway: 0.5, fx: { type: 'jet', period: 1.35, mag: 0.55 } },
-    { id: 'gills', label: '皱鳃开合', hold: 5, pose: [0, 0, 0], amp: 0.7, freq: 0.8, bob: 0.5, sway: 0.5, fx: { type: 'gape', period: 1.7, mag: 0.28 } },
+    { id: 'slither', label: '蛇形游动', hold: 6 },
+    { id: 'lunge', label: '弹射咬捕', hold: 4.5 },
+    { id: 'gillflare', label: '皱鳃开合', hold: 5 },
   ],
+  // ---- remaining Tripo static GLBs: procedural fx (no Blender clips) ----
   oarfish: [
     { id: 'upright', label: '垂直悬立', hold: 6.5, pose: [0, 0, 0], amp: 0.7, freq: 0.8, bob: 0.55, sway: 0.5, fx: { type: 'finpaddle', period: 2.6, mag: 0.04 } },
     { id: 'dorsal', label: '背鳍波动', hold: 5.5, pose: [0, 0, 0.08], amp: 1.7, freq: 1.6, bob: 0.6, sway: 0.7, fx: { type: 'finpaddle', period: 1.05, mag: 0.1 } },
     { id: 'dive', label: '缓慢下潜', hold: 6, pose: [0.12, 0, 0], amp: 0.6, freq: 0.6, bob: 0.5, sway: 0.45, fx: { type: 'sink', period: 6.5, mag: 0.38 } },
   ],
   clownfish: [
-    { id: 'anemone', label: '钻进海葵', hold: 5, pose: [0.25, 0, 0], amp: 0.6, freq: 0.8, bob: 0.45, sway: 0.45, fx: { type: 'retract', period: 2.8, mag: 0.32 } },
-    { id: 'fan', label: '护卵扇水', hold: 5.5, pose: [0, 0, 0], amp: 1.5, freq: 1.7, bob: 0.5, sway: 0.6, fx: { type: 'finpaddle', period: 1.05, mag: 0.16 } },
-    { id: 'chase', label: '驱赶入侵者', hold: 4, pose: [0, 0, 0.1], amp: 1.4, freq: 1.6, bob: 0.6, sway: 0.8, fx: { type: 'jet', period: 1.15, mag: 0.34 } },
+    { id: 'nestle', label: '钻进海葵', hold: 5 },
+    { id: 'fan', label: '护卵扇水', hold: 5 },
+    { id: 'chase', label: '驱赶入侵者', hold: 4.5 },
   ],
   seahorse: [
     { id: 'grasp', label: '尾卷海草', hold: 6, pose: [0.1, 0, 0.2], amp: 0.6, freq: 0.7, bob: 0.45, sway: 0.5, fx: { type: 'curl', period: 3.6, mag: 0.42 } },
@@ -138,15 +139,15 @@ export const BEHAVIORS = {
     { id: 'bubble', label: '泡泡环', hold: 5 },
   ],
   sperm_whale: [
-    { id: 'sleep', label: '垂直睡眠', hold: 7, pose: [1.35, 0, 0], amp: 0.5, freq: 0.55, bob: 0.45, sway: 0.45, fx: { type: 'sink', period: 8, mag: 0.06 } },
-    { id: 'dive', label: '深潜捕乌贼', hold: 5.5, pose: [0.65, 0, 0], amp: 0.8, freq: 0.85, bob: 0.5, sway: 0.45, fx: { type: 'sink', period: 4.4, mag: 0.5 } },
-    { id: 'blow', label: '喷气(左斜)', hold: 4.5, pose: [0, 0.4, -0.28], amp: 0.6, freq: 0.7, bob: 0.6, sway: 0.5, fx: { type: 'rise', period: 3.1, mag: 0.22 } },
-    { id: 'click', label: '喀哒声定位', hold: 5.5, pose: [0.1, 0.2, 0], amp: 0.65, freq: 0.75, bob: 0.5, sway: 0.6, fx: { type: 'sweep', period: 4, mag: 0.22 } },
+    { id: 'sleep', label: '垂直睡眠', hold: 6, view: { pitch: 0.18, dist: 2.2, mobDist: 3.4, track: true } },
+    { id: 'dive', label: '深潜捕乌贼', hold: 5.5, view: { dist: 2.8, mobDist: 4.4, frameY: 40, track: true } },
+    { id: 'blow', label: '喷气换气', hold: 5 },
+    { id: 'click', label: '喀哒定位', hold: 5.5 },
   ],
   leatherback: [
-    { id: 'migrate', label: '长距洄游', hold: 6.5, pose: [0, 0, 0.05], amp: 1.05, freq: 0.95, bob: 0.8, sway: 0.9, fx: { type: 'sweep', period: 6.5, mag: 0.38 } },
-    { id: 'dive', label: '深潜捕水母', hold: 5.5, pose: [0.5, 0, 0], amp: 0.85, freq: 0.9, bob: 0.5, sway: 0.5, fx: { type: 'sink', period: 5, mag: 0.45 } },
-    { id: 'nest', label: '沙滩产卵', hold: 6, pose: [0.4, 0, 0.1], amp: 0.55, freq: 0.6, bob: 0.45, sway: 0.45, fx: { type: 'pin', period: 4.2, mag: 0.22 } },
+    { id: 'cruise', label: '长距洄游', hold: 6 },
+    { id: 'dive', label: '深潜捕水母', hold: 5 },
+    { id: 'nest', label: '沙滩产卵', hold: 6 },
   ],
   giant_squid: [
     { id: 'arms', label: '长腕捕猎', hold: 5.5, pose: [0.15, 0, 0], amp: 1.6, freq: 1.2, bob: 0.6, sway: 0.8, fx: { type: 'retract', period: 3, mag: 0.38 } },
