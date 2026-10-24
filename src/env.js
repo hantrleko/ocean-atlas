@@ -221,9 +221,11 @@ const MOMENT = {
   great_white: {
     beh: 'breach',
     patch: {
-      fog: 0.02, sun: 1.2, rays: 1.35, surf: 1, snowOp: 0.18,
-      top: 0xb7ecff, hor: 0x1f78b0, bot: 0x0a4068, exposure: 1.12,
-      hemi: [0xf4fbff, 0x1a4868, 1.48], key: [0xfff8ea, 2.55],
+      fog: 0.018, sun: 1.25, rays: 1.4, surf: 1, snowOp: 0.1,
+      bed: 0, grass: 0, rocks: 0, caus: 0, water: 0,
+      ceil: 1, ceilY: 2.35,
+      top: 0xc5f0ff, hor: 0x1a6ea8, bot: 0x083048, exposure: 1.14,
+      hemi: [0xf7fcff, 0x163858, 1.5], key: [0xfff8ea, 2.6],
     },
   },
   turtle: {
@@ -237,17 +239,40 @@ const MOMENT = {
   dolphin: {
     beh: 'leap',
     patch: {
-      fog: 0.02, sun: 1.15, rays: 1.25, surf: 1, specks: 0.22, speckCol: 0xe8f8ff,
-      top: 0x8ad6f4, exposure: 1.1,
-      hemi: [0xf2fbff, 0x1a4a68, 1.42], key: [0xfff6e2, 2.4],
+      fog: 0.016, sun: 1.2, rays: 1.35, surf: 1, specks: 0.18, speckCol: 0xe8f8ff,
+      bed: 0, grass: 0, rocks: 0, caus: 0, water: 0,
+      ceil: 1, ceilY: 2.15, snowOp: 0.08,
+      top: 0xb7e8ff, hor: 0x1f78b4, bot: 0x0a4068, exposure: 1.12,
+      hemi: [0xf2fbff, 0x1a4a68, 1.48], key: [0xfff6e2, 2.5],
+    },
+  },
+  manta: {
+    beh: 'leap',
+    patch: {
+      fog: 0.018, sun: 1.15, rays: 1.3, surf: 1,
+      bed: 0, grass: 0, rocks: 0, caus: 0, water: 0,
+      ceil: 1, ceilY: 2.4, snowOp: 0.1,
+      top: 0x9ad8f4, hor: 0x1c6ea4, bot: 0x083858, exposure: 1.1,
+      hemi: [0xe8f6ff, 0x1a4460, 1.4], key: [0xfff4dc, 2.3],
+    },
+  },
+  orca: {
+    beh: 'hunt',
+    patch: {
+      fog: 0.02, sun: 0.85, rays: 1, surf: 0.8, snowOp: 0.62,
+      bed: 0, grass: 0, rocks: 0, caus: 0.2,
+      water: 0.45, waterY: 1.7, ceil: 0.4, ceilY: 2.7,
+      top: 0xe7f8ff, hor: 0x9fd0e6, bot: 0x1a5878, exposure: 1.1,
+      hemi: [0xf4fbff, 0x4a7890, 1.4], key: [0xf7fbff, 2.05],
     },
   },
   sperm_whale: {
     beh: 'sleep',
     patch: {
-      fog: 0.064, sun: 0.05, rays: 0.28, surf: 0.08, snowOp: 0.9, specks: 0.55, speckCol: 0x3a88b0,
-      top: 0x061018, hor: 0x07141e, bot: 0x02060c, exposure: 0.84,
-      hemi: [0x3a5878, 0x040810, 0.62], key: [0x8aa4c0, 0.72],
+      fog: 0.036, sun: 0.16, rays: 0.42, surf: 0.1, snowOp: 0.7, specks: 0.7, speckCol: 0x7eb4dc,
+      bed: 0, grass: 0, rocks: 0,
+      top: 0x0e2034, hor: 0x142838, bot: 0x081420, exposure: 1.05,
+      hemi: [0x7aa4c4, 0x101820, 1.05], key: [0xd0def0, 1.35],
     },
   },
   giant_squid: {
@@ -481,9 +506,10 @@ void main(){vec3 v=normalize(cameraPosition-vW);float fr=pow(1.-abs(v.y),3.);
     if (sid === 'vampire' && beh === 'snow') burst = Math.max(burst, .35);
   }
 
-  function set(speciesId, instant) {
+  function set(speciesId, instant, habitatKey) {
     sid = speciesId; lastBeh = null; prevTrack = null;
-    target = PRESETS[speciesId] || PRESETS.angler;
+    const named = habitatKey && ENV[habitatKey];
+    target = named || PRESETS[speciesId] || PRESETS.angler;
     if (instant) { for (const k of NUM) st[k] = target[k] ?? 0; for (const k of COL) st[k].set(target[k] ?? 0); }
   }
   const tmpC = new THREE.Color();
@@ -521,7 +547,9 @@ void main(){vec3 v=normalize(cameraPosition-vW);float fr=pow(1.-abs(v.y),3.);
     rayU.op.value = st.rays * (dark ? .6 : 1); rays.visible = st.rays > .02;
     // water
     const wOp = Math.max(st.water, st.ceil); water.visible = wOp > .02; wU.op.value = wOp;
-    wU.below.value = target.ceil ? 1 : 0; water.position.y = target.ceil ? ceilY + (1 - st.ceil) * 3 : (target.waterY ?? -.15) - (1 - st.water) * 2;
+    const ceilOn = (look.ceil || 0) > 0.45 || (target.ceil || 0) > 0.45;
+    wU.below.value = ceilOn ? 1 : 0;
+    water.position.y = ceilOn ? ceilY + (1 - st.ceil) * 3 : (look.waterY ?? target.waterY ?? -.15) - (1 - st.water) * 2;
     // lights: tint toward preset
     const [hs, hg, hi] = look.hemi, [kc, ki] = look.key;
     lights.hemi.color.lerp(tmpC.set(hs), k); lights.hemi.groundColor.lerp(tmpC.set(hg), k);
@@ -530,7 +558,9 @@ void main(){vec3 v=normalize(cameraPosition-vW);float fr=pow(1.-abs(v.y),3.);
     flick = st.caus > .1 || st.rays > .3 ? (Math.sin(t * 3.1) * .5 + Math.sin(t * 5.3) * .3) * .08 : 0;
     renderer.toneMappingExposure = lights.expBase * st.exposure * (1 + flick * .5);
     // whale: the surface comes down into view while it surfaces / breaches / lobtails
-    const want = sid === 'whale' ? ({ breach: .5, blow: 1.0, lobtail: .45 }[beh] ?? (target.ceilY || 3.4)) : (target.ceilY || 3.4);
+    const want = sid === 'whale'
+      ? ({ breach: .5, blow: 1.0, lobtail: .45 }[beh] ?? (look.ceilY || target.ceilY || 3.4))
+      : (look.ceilY || target.ceilY || 3.4);
     ceilY += (want - ceilY) * (1 - Math.exp(-dt * 1.6));
     react(beh, cur, t, dt);
     simParts(dt);

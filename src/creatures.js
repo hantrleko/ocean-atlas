@@ -277,11 +277,16 @@ export function releaseCreature(id) {
 
 /** Dispose materials cloned onto a displayed creature. Geometry stays with the template. */
 export function disposeCloneMaterials(root) {
+  const dead = [];
   root?.traverse(o => {
     if (!o.isMesh || !o.material) return;
     const mats = Array.isArray(o.material) ? o.material : [o.material];
-    mats.forEach(m => m.dispose());
+    mats.forEach(m => { dead.push(m); m.dispose(); });
   });
+  if (!dead.length) return;
+  for (let i = glowMats.length - 1; i >= 0; i--) {
+    if (dead.includes(glowMats[i])) glowMats.splice(i, 1);
+  }
 }
 
 function wrapModel(raw, targetSize, fromGlb) {

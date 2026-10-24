@@ -41,7 +41,9 @@ export const FRAMES = {
   coelacanth: { dist: 8.1, fov: 31, size: 3.3, yaw: 0.55, pitch: 0.08 },
   orca: { dist: 8.3, fov: 32, size: 3.35, yaw: 0.58, pitch: 0.08 },
   dolphin: { dist: 7.5, fov: 31, size: 3.25, yaw: 0.68, pitch: 0.06 },
-  sperm_whale: { dist: 7.7, fov: 30, size: 3.5, yaw: 0.48, pitch: 0.1, aimY: 0.08 },
+  // Vertical sleep swings the body off the bind-pose centre. Stay back so the
+  // whole whale reads in deep water instead of a near-black crop.
+  sperm_whale: { dist: 10.6, fov: 32, size: 3.15, yaw: 0.62, pitch: 0.18, aimY: 0.04 },
   leatherback: { dist: 8.1, fov: 32, size: 3.25, yaw: 0.48, pitch: 0.1 },
   // Length axis is X. The old dist left the mantle outside the gap between the side panels.
   // Scale comparison already pulled back to the bbox; match that wider, re-aimed rest view.

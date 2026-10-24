@@ -34,9 +34,51 @@ export const ACTS = [
     id: 'polar',
     title: '极地冰缘',
     kicker: '第四展区',
-    copy: '水更冷，天更白。家族沿着冰排开，伞下拖着比身体长得多的触手。',
+    copy: '水更冷，天更白。常驻的是虎鲸和狮鬃水母。这一季借来两件冷水里说得通的客人，它们不改户籍。',
     lead: 'orca',
     ids: ['orca', 'lionsmane'],
+    /** 借展：出现在本翼路径里，深链与搜索仍回原展区。 */
+    guests: ['whale', 'leatherback'],
+    env: 'polar_ice_edge',
+  },
+];
+
+/**
+ * 本季特展。换季只改这一段：一句说明，和 3–5 个可跨翼的停靠。
+ * `act` 是打开时走哪一翼（借展停在极地，不把户籍改过去）。
+ */
+export const SEASON = {
+  id: 'polar-loan-2026',
+  kicker: '本季特展',
+  title: '冰缘来客',
+  copy: '四翼的位置不动。只把冷水里说得通的几件，暂时借到冰缘灯下走走。',
+  stops: [
+    { id: 'orca', act: 'polar' },
+    { id: 'whale', act: 'polar' },
+    { id: 'leatherback', act: 'polar' },
+    { id: 'lionsmane', act: 'polar' },
+  ],
+};
+
+/** 对仗。点一下走到对方那一柜，不同屏。 */
+export const PAIRS = [
+  {
+    a: 'sperm_whale',
+    b: 'giant_squid',
+    label: { sperm_whale: '大王乌贼', giant_squid: '抹香鲸' },
+    note: {
+      sperm_whale: '它要下潜去找的那双眼睛，在暮光里。',
+      giant_squid: '盯着它的那头鲸，头朝上睡在更深的地方。',
+    },
+  },
+  {
+    a: 'leatherback',
+    b: 'lionsmane',
+    label: { leatherback: '狮鬃水母', lionsmane: '棱皮龟' },
+    note: {
+      leatherback: '冷水里它追的就是这种水母。这一季可以走到冰缘去看。',
+      lionsmane: '追着这张网来的棱皮龟，户籍仍在大洋上层。',
+    },
   },
 ];
 
@@ -97,6 +139,24 @@ export function actOf(speciesId) {
   return ACTS.find(a => a.ids.includes(speciesId)) || ACTS[0];
 }
 
+/** 本翼常驻 + 借展。借展不写入户籍，actOf 仍回原来的翼。 */
+export function wingMembers(act) {
+  if (!act) return [];
+  return [...act.ids, ...(act.guests || [])];
+}
+
+export function isGuest(act, speciesId) {
+  return !!act?.guests?.includes(speciesId);
+}
+
+export function pairOf(speciesId) {
+  for (const p of PAIRS) {
+    if (p.a === speciesId) return { id: p.b, label: p.label[speciesId], note: p.note[speciesId] };
+    if (p.b === speciesId) return { id: p.a, label: p.label[speciesId], note: p.note[speciesId] };
+  }
+  return null;
+}
+
 export function actIndex(id) {
   const i = ACTS.findIndex(a => a.id === id);
   return i < 0 ? 0 : i;
@@ -124,8 +184,18 @@ export function assertJourney() {
   const badLead = ACTS.filter(a => !a.ids.includes(a.lead)).map(a => a.id);
   const badFlag = FLAGSHIPS.filter(f => !all.includes(f.id) || !BEHAVIORS[f.id]?.some(b => b.id === f.behavior)).map(f => f.id);
   const missingLine = all.filter(id => !LINES[id]);
-  if (missing.length || extra.length || dup.length || badLead.length || badFlag.length || missingLine.length) {
-    const msg = JSON.stringify({ missing, extra, dup, badLead, badFlag, missingLine });
+  const guests = ACTS.flatMap(a => a.guests || []);
+  const badGuest = ACTS.filter(a => (a.guests || []).some(id => !all.includes(id) || !ids.includes(id) || a.ids.includes(id) || !a.env)).map(a => a.id);
+  const guestDup = guests.filter((id, i) => guests.indexOf(id) !== i);
+  const badPair = PAIRS.filter(p => !all.includes(p.a) || !all.includes(p.b) || p.a === p.b || !p.label?.[p.a] || !p.label?.[p.b]).map(p => `${p.a}:${p.b}`);
+  const stops = SEASON.stops || [];
+  const badStop = stops.filter(s => {
+    const act = ACTS.find(a => a.id === s.act);
+    return !all.includes(s.id) || !act || !wingMembers(act).includes(s.id);
+  }).map(s => s.id);
+  const badSeason = stops.length < 3 || stops.length > 5;
+  if (missing.length || extra.length || dup.length || badLead.length || badFlag.length || missingLine.length || badGuest.length || guestDup.length || badPair.length || badStop.length || badSeason) {
+    const msg = JSON.stringify({ missing, extra, dup, badLead, badFlag, missingLine, badGuest, guestDup, badPair, badStop, badSeason });
     throw new Error(`[journey] ${msg}`);
   }
 }

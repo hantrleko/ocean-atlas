@@ -14,7 +14,9 @@ body{font-family:var(--sans);color:var(--ink);background:radial-gradient(ellipse
 .glass{position:fixed;top:18px;bottom:18px;background:var(--glass);backdrop-filter:blur(28px) saturate(1.15);-webkit-backdrop-filter:blur(28px) saturate(1.15);border:1px solid var(--line);border-radius:24px;box-shadow:0 16px 48px rgba(20,30,50,.07);transition:transform .7s cubic-bezier(.7,0,.2,1),opacity .6s,background .6s;z-index:5}
 body.dark .glass{box-shadow:0 0 40px rgba(62,230,216,.05),0 20px 60px rgba(0,0,0,.4)}
 #left{left:18px;width:268px;padding:18px 14px 16px;display:flex;flex-direction:column}
-.logo{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex:0 0 auto}
+.logo{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex:0 0 auto;position:relative}
+.pass-open{margin-left:auto;border:0;background:transparent;color:var(--mute);font-family:var(--serif);font-size:12px;letter-spacing:2px;cursor:pointer;padding:4px 2px}
+.pass-open:hover{color:var(--ink)}
 .logo b{font-family:var(--serif);font-size:20px;letter-spacing:2px;display:block;font-weight:600}
 .logo small{font-size:10px;letter-spacing:3px;color:var(--mute)}
 .mark{width:34px;height:34px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#bff6ff,var(--acc) 60%,#0b3a4a);box-shadow:0 0 18px color-mix(in srgb,var(--acc) 50%,transparent)}
@@ -466,10 +468,25 @@ body.light.env-dark .deg{color:#9fb4c8}
 #acts button.on{background:var(--ink);color:var(--bg1)}
 #acts button.on i{color:inherit;opacity:.7}
 body.dark #acts button.on{background:var(--acc);color:#04151c}
-.card.flag{border-color:color-mix(in srgb,var(--acc) 55%,var(--line))}
+.card.flag{position:relative;border-color:color-mix(in srgb,var(--acc) 55%,var(--line))}
+.card.flag.unseen{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--acc) 70%,transparent)}
+.card.flag.seen::after{
+  content:'看';position:absolute;top:6px;right:8px;
+  font-family:var(--serif);font-size:10px;letter-spacing:0;opacity:.55;
+  width:16px;height:16px;border:1px solid currentColor;border-radius:50%;
+  display:grid;place-items:center;
+}
+.card.guest i{letter-spacing:.5px}
+#acts button.seen{position:relative}
+#acts button.seen::after{
+  content:'过';position:absolute;right:32px;top:50%;transform:translateY(-50%);
+  font-family:var(--serif);font-size:10px;font-style:normal;letter-spacing:0;
+  width:16px;height:16px;border:1px solid currentColor;border-radius:50%;
+  display:grid;place-items:center;opacity:.55;
+}
 #wing{
   position:fixed;top:92px;left:318px;right:392px;z-index:4;
-  display:flex;align-items:center;gap:14px;
+  display:flex;align-items:center;flex-wrap:wrap;gap:8px 14px;
   padding:10px 16px;border-radius:18px;
   background:var(--glass);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
   border:1px solid var(--line);box-shadow:0 10px 32px rgba(20,30,50,.08);
@@ -477,6 +494,51 @@ body.dark #acts button.on{background:var(--acc);color:#04151c}
 }
 #wing small{font-size:10px;letter-spacing:2px;color:var(--mute);display:block}
 #wing b{display:block;font-family:var(--serif);font-size:22px;letter-spacing:2px;margin:2px 0 0;font-weight:600;white-space:nowrap}
+#wingSeal{
+  font-style:normal;font-family:var(--serif);font-size:11px;letter-spacing:1px;color:var(--mute);
+  border:1px solid var(--line);border-radius:50%;width:28px;height:28px;display:grid;place-items:center;flex:0 0 auto;
+}
+#wingSeal[hidden]{display:none !important}
+.season{flex:1 0 100%;display:flex;align-items:center;gap:8px;min-width:0;margin-bottom:2px}
+.season-k,.season b{font-size:10px;letter-spacing:2px;color:var(--mute);font-weight:500;white-space:nowrap}
+.season b{font-family:var(--serif);font-size:13px;letter-spacing:1px;color:var(--ink)}
+.season-stops{display:flex;align-items:center;gap:6px;min-width:0;overflow-x:auto;scrollbar-width:none}
+.season-stops::-webkit-scrollbar{display:none}
+.season-dot{color:var(--mute);font-size:12px}
+.season button{
+  border:1px solid var(--line);background:transparent;color:var(--ink);
+  font-family:var(--serif);font-size:12px;letter-spacing:.5px;padding:3px 8px;border-radius:99px;cursor:pointer;white-space:nowrap;
+}
+.season button.on{background:var(--ink);color:var(--bg1);border-color:transparent}
+#pair,#pairCap{
+  border:0;background:transparent;color:var(--acc);font-family:var(--serif);
+  font-size:14px;letter-spacing:1px;cursor:pointer;padding:0;margin-top:6px;text-align:left;
+}
+#pair[hidden],#pairCap[hidden]{display:none !important}
+#pairCap{pointer-events:auto;display:inline-block;margin-top:8px}
+#hello{
+  position:fixed;left:50%;top:178px;transform:translateX(-50%);z-index:6;
+  max-width:min(92vw,640px);padding:8px 16px;border-radius:99px;
+  background:var(--glass);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border:1px solid var(--line);color:var(--ink);
+  font-family:var(--serif);font-style:italic;font-size:14px;letter-spacing:.5px;
+  pointer-events:none;box-shadow:0 10px 28px rgba(10,20,40,.1);
+}
+#hello[hidden]{display:none !important}
+.share-still{width:100%;aspect-ratio:1/1;border-radius:16px;overflow:hidden;background:#0c3048;margin-bottom:12px}
+.share-still img{width:100%;height:100%;object-fit:cover;display:block}
+.share-still img[hidden]{display:none !important}
+.share-card em{
+  display:inline-block;margin:8px 8px 0 0;font-style:normal;font-size:11px;letter-spacing:2px;
+  border:1px solid var(--line);border-radius:99px;padding:3px 8px;color:var(--mute);
+}
+.share-card em[hidden]{display:none !important}
+#passBody{margin:10px 0 14px;max-height:46vh;overflow:auto}
+#passBody h3{margin:12px 0 6px}
+#passBody ul{list-style:none;font-size:13px;line-height:1.7}
+#passBody .pass-note{font-family:var(--serif);font-style:italic;font-size:13px;color:var(--mute);line-height:1.55}
+#passport{position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:rgba(6,12,20,.46);padding:18px}
+#passport[hidden]{display:none !important}
 #wing p{
   font-size:13px;line-height:1.5;color:var(--mute);margin:0;flex:1;min-width:0;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
@@ -571,6 +633,8 @@ body.mobile.imm #caption{
   color:#f7fbff !important;
   text-shadow:0 2px 16px rgba(0,0,0,.72) !important;
 }
+body.imm #pairCap,
+body.mobile.imm #pairCap{color:#f7fbff;text-shadow:0 2px 12px rgba(0,0,0,.65)}
 body.imm #hint,
 body.mobile.imm #hint{opacity:0;transition:opacity .8s,transform .45s}
 body.imm #hint.show,
