@@ -43,7 +43,9 @@ export const FRAMES = {
   dolphin: { dist: 7.9, fov: 32, size: 3.2, yaw: 0.62, pitch: 0.08 },
   sperm_whale: { dist: 8.0, fov: 30, size: 3.45, yaw: 0.5, pitch: 0.08, aimY: 0.04 },
   leatherback: { dist: 8.1, fov: 32, size: 3.25, yaw: 0.48, pitch: 0.1 },
-  giant_squid: { dist: 8.2, fov: 33, size: 3.55, yaw: 0.42, pitch: 0.12, aimY: -0.06 },
+  // Length axis is X. The old dist left the mantle outside the gap between the side panels.
+  // Scale comparison already pulled back to the bbox; match that wider, re-aimed rest view.
+  giant_squid: { dist: 11.6, fov: 32, size: 3.4, yaw: 0.72, pitch: 0.1, aimY: 0.04, aimX: -0.22 },
   octopus: { dist: 7.9, fov: 34, size: 3.1, yaw: 0.4, pitch: 0.18 },
   lionsmane: { dist: 8.6, fov: 34, size: 3.55, yaw: 0.3, pitch: 0.14, aimY: -0.2 },
   comb_jelly: { dist: 7.5, fov: 32, size: 2.9, yaw: 0.3, pitch: 0.1 },
@@ -58,4 +60,29 @@ export const FRAMES = {
 export function frameFor(id) {
   const f = FRAMES[id];
   return f ? { ...DEFAULT_FRAME, ...f } : { ...DEFAULT_FRAME };
+}
+
+/**
+ * Camera distance that keeps an axis-aligned box inside the visible stage.
+ * `gap` is the fraction of the horizontal frustum not covered by the side panels
+ * (1 on phones). Euler matches stage.rotation (XYZ, z = 0): pitch is applied, then yaw.
+ */
+export function distToContain(half, { yaw = 0, pitch = 0, fov = 35, aspect = 1.6, gap = 1, pad = 1.16 } = {}) {
+  const tanV = Math.tan((fov * Math.PI / 180) / 2);
+  const tanH = tanV * Math.max(0.55, aspect) * Math.max(0.38, gap);
+  const a = Math.cos(pitch), b = Math.sin(pitch);
+  const c = Math.cos(yaw), d = Math.sin(yaw);
+  let D = 0;
+  for (const x of [-half.x, half.x]) {
+    for (const y of [-half.y, half.y]) {
+      for (const z of [-half.z, half.z]) {
+        const x1 = (c * x + d * z) * pad;
+        const y1 = (b * d * x + a * y - b * c * z) * pad;
+        const z1 = (-a * d * x + b * y + a * c * z) * pad;
+        const need = z1 + Math.max(Math.abs(x1) / tanH, Math.abs(y1) / tanV);
+        if (need > D) D = need;
+      }
+    }
+  }
+  return D;
 }

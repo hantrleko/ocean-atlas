@@ -352,15 +352,21 @@ function sampleInto(outer, raw, out, per) {
     }
   });
 }
-function measureFitRigged(outer, raw, clips) {
+function measureFitRigged(outer, raw, clips, steps = 8, per = 500) {
   const out = [], m = new THREE.AnimationMixer(raw);
   for (const c of clips) {
     const a = m.clipAction(c); a.play();
-    for (let k = 0; k < 8; k++) { m.setTime(c.duration * k / 8); sampleInto(outer, raw, out, 500); }
+    const n = Math.max(1, steps);
+    for (let k = 0; k < n; k++) { m.setTime(c.duration * k / n); sampleInto(outer, raw, out, per); }
     a.stop();
   }
   m.stopAllAction(); m.uncacheRoot(raw);
   return { pts: new Float32Array(out), pad: 0.03 };
+}
+function cheapFit(outer, raw) {
+  const out = [];
+  sampleInto(outer, raw, out, 220);
+  return { pts: new Float32Array(out), pad: 0.08 };
 }
 function measureFitStatic(outer, raw, id, ctrl) {
   const out = [];
@@ -384,6 +390,108 @@ function cloneMaterials(root) {
     if (Array.isArray(o.material)) o.material = o.material.map(m => m.clone());
     else o.material = o.material.clone();
   });
+}
+
+/**
+ * Tripo skin weights on the seahorse tear when a thin bone scales or the tail
+ * curls hard (grip shreds the mesh; sip stretches the snout into orange spikes).
+ * Factors are "how much of the authored delta to keep" (0 = hold the first key / unit scale).
+ */
+const CLIP_SOFTEN = {
+  seahorse: {
+    grip: { rot: { tail1: 0.46, tail2: 0.4, tail3: 0.34, tail4: 0.3, tail5: 0.26 } },
+    sip: { scale: { snout: 0, head: 0.15 }, rot: { snout: 0.42 } },
+    brood: { scale: { pouch: 0.12, abdomen: 0.3 } },
+    dance: { scale: { dorsal: 0.35 } },
+  },
+};
+
+function softenClip(id, clip) {
+  const spec = CLIP_SOFTEN[id]?.[clip.name];
+  if (!spec) return clip;
+  let changed = false;
+  const tracks = clip.tracks.map(tr => {
+    const dot = tr.name.lastIndexOf('.');
+    const bone = tr.name.slice(0, dot);
+    const prop = tr.name.slice(dot + 1);
+    if (prop === 'quaternion' && spec.rot) {
+      const k = typeof spec.rot === 'number' ? spec.rot : spec.rot[bone];
+      if (k == null || k >= 0.999) return tr;
+      const values = new Float32Array(tr.values);
+      const q0 = new THREE.Quaternion().fromArray(values, 0).normalize();
+      const q = new THREE.Quaternion();
+      for (let i = 4; i < values.length; i += 4) {
+        q.fromArray(values, i).normalize();
+        if (q0.dot(q) < 0) q.set(-q.x, -q.y, -q.z, -q.w);
+        q0.clone().slerp(q, k).normalize().toArray(values, i);
+      }
+      changed = true;
+      return new THREE.QuaternionKeyframeTrack(tr.name, tr.times, values);
+    }
+    if (prop === 'scale' && spec.scale) {
+      const k = typeof spec.scale === 'number' ? spec.scale : spec.scale[bone];
+      if (k == null || k >= 0.999) return tr;
+      const values = new Float32Array(tr.values);
+      for (let i = 0; i < values.length; i += 3) {
+        values[i] = 1 + (values[i] - 1) * k;
+        values[i + 1] = 1 + (values[i + 1] - 1) * k;
+        values[i + 2] = 1 + (values[i + 2] - 1) * k;
+      }
+      changed = true;
+      return new THREE.VectorKeyframeTrack(tr.name, tr.times, values);
+    }
+    return tr;
+  });
+  return changed ? new THREE.AnimationClip(clip.name, clip.duration, tracks) : clip;
+}
+
+/** Moon jelly GLB is an opaque Tripo shell. Pull it toward a readable bell. */
+function softenMoonJelly(root) {
+  root.traverse(o => {
+    if (!o.isMesh || !o.material) return;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    mats.forEach(m => {
+      m.transparent = true;
+      m.opacity = Math.min(typeof m.opacity === 'number' ? m.opacity : 1, 0.46);
+      m.depthWrite = false;
+      m.side = THREE.DoubleSide;
+      if (typeof m.roughness === 'number') m.roughness = Math.min(m.roughness, 0.22);
+      if (m.emissive) {
+        m.emissive.set(0xd4f2ff);
+        m.emissiveIntensity = Math.max(m.emissiveIntensity || 0, 0.22);
+        m.userData.base = m.emissiveIntensity;
+        glowMats.push(m);
+      }
+      m.needsUpdate = true;
+    });
+  });
+}
+
+/** «变色伪装»: cycle the body tint so the clip reads even when the GLB motion is subtle. */
+function makeOctopusCamo(raw) {
+  const mats = [];
+  raw.traverse(o => {
+    if (!o.isMesh || !o.material) return;
+    const list = Array.isArray(o.material) ? o.material : [o.material];
+    list.forEach(m => {
+      if (!m.color) return;
+      if (!m.userData.camoBase) m.userData.camoBase = m.color.clone();
+      mats.push(m);
+    });
+  });
+  const cols = [0xc4623e, 0x6e8f3e, 0xe4d2a4, 0x3a322c, 0x8d4a38].map(c => new THREE.Color(c));
+  const tmp = new THREE.Color();
+  return function update(t, behaviorId) {
+    const on = behaviorId === 'camouflage';
+    mats.forEach(m => {
+      const base = m.userData.camoBase;
+      if (!on) { m.color.lerp(base, 0.1); return; }
+      const u = t * 0.7;
+      const i = Math.floor(u) % cols.length;
+      tmp.copy(cols[i]).lerp(cols[(i + 1) % cols.length], u - Math.floor(u));
+      m.color.lerp(tmp, 0.28);
+    });
+  };
 }
 
 /** Map UI behavior id → AnimationClip (clip names == behavior ids, authored in Blender). */
@@ -451,7 +559,12 @@ function makeRiggedUpdater(raw, outer, id, mixer, clips) {
   const list = behaviorsFor(id).filter(b => clips[b.id]);
   let autoIdx = 0, autoT0 = null;
   playClip(clipForBehavior(id, list[0]?.id, clips), 0, list[0]?.id);
-  const fx = [id === 'angler' && makeLureGlow(raw, outer), id === 'angler' && makeMouthCavity(raw), id === 'whale' && makeSpout(raw, outer)].filter(Boolean);
+  const fx = [
+    id === 'angler' && makeLureGlow(raw, outer),
+    id === 'angler' && makeMouthCavity(raw),
+    id === 'whale' && makeSpout(raw, outer),
+    id === 'octopus' && makeOctopusCamo(raw),
+  ].filter(Boolean);
   const activeId = () => (mode === 'auto' ? list[autoIdx]?.id : mode);
   /** Camera hint for the current behaviour ({yaw, pitch, dist, lookY}) — consumed by main.js. */
   const trackBone = raw.getObjectByName(id === 'whale' ? 'spine3' : 'root');
@@ -514,17 +627,29 @@ export async function loadCreature(id, onProgress) {
     const useRig = RIGGED_IDS.has(id) && template.animations.length > 0;
     const raw = useRig ? SkeletonUtils.clone(template.scene) : template.scene.clone(true);
     cloneMaterials(raw);
+    if (id === 'jelly') softenMoonJelly(raw);
     const fitSize = frameFor(id).size;
 
     if (useRig) {
       const { outer, k } = wrapModel(raw, fitSize, true);
       if (id === 'gulper') brightenDeepSea(raw);
       const mixer = new THREE.AnimationMixer(raw);
-      const clips = Object.fromEntries(template.animations.map(a => [a.name, a]));
-      const fit = measureFitRigged(outer, raw, template.animations);
+      const clips = Object.fromEntries(template.animations.map(a => [a.name, softenClip(id, a)]));
+      // Bind-pose envelope now; the full clip cloud is deferred so a cold switch can paint.
+      const fit = cheapFit(outer, raw);
       const ctrl = makeRiggedUpdater(raw, outer, id, mixer, clips);
+      const refineFit = apply => {
+        const idle = window.requestIdleCallback || (fn => setTimeout(fn, 600));
+        idle(() => {
+          try {
+            const probe = SkeletonUtils.clone(template.scene);
+            const wrapped = wrapModel(probe, fitSize, true);
+            apply(measureFitRigged(wrapped.outer, probe, template.animations, 4, 240));
+          } catch (err) { console.warn('[ocean-atlas] envelope', err?.message || err); }
+        }, { timeout: 2800 });
+      };
       return {
-        fit,
+        fit, refineFit,
         g: outer, raw, up: ctrl.up, setMode: ctrl.setMode, getMode: ctrl.getMode, k, mixer, view: ctrl.view, trackY: ctrl.trackY, active: ctrl.active,
       };
     }

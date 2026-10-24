@@ -58,8 +58,12 @@ body.dark #tools button#bScale.on{background:var(--acc);color:#04151c}
 .search input{border:0;background:none;outline:none;color:var(--ink);height:44px;width:100%;font-size:13px}
 .search span{color:var(--mute)}
 #results{position:absolute;top:50px;left:0;right:0;background:var(--card);backdrop-filter:blur(20px);border-radius:14px;border:1px solid var(--line);display:none;overflow:hidden;z-index:9}
-#results div{padding:9px 14px;font-size:13px;cursor:pointer}#results div:hover{background:var(--line)}
-#results i{color:var(--mute);font-size:11px;margin-left:6px}
+#results div{padding:9px 14px;font-size:13px;cursor:pointer;display:flex;align-items:baseline;gap:6px}#results div:hover{background:var(--line)}
+#results b{font-weight:600}
+#results i{color:var(--mute);font-size:12px;margin:0;font-family:var(--serif)}
+#results i::before{content:'·';margin-right:6px;font-style:normal;font-family:var(--sans);color:var(--mute)}
+#results .empty{cursor:default;color:var(--mute);display:block}
+#results .empty:hover{background:transparent}
 #theme{position:relative;overflow:hidden}
 #theme span{position:absolute;inset:0;display:grid;place-items:center;transition:.5s}
 body.light .moon,body.dark .sun{transform:translateY(40px);opacity:0}
@@ -81,7 +85,8 @@ td{padding:8px 0;border-bottom:1px solid var(--line);vertical-align:top}td:first
 body.imm #left{transform:translateX(-120%);opacity:0}body.imm #right{transform:translateX(120%);opacity:0}
 body.imm .carousel{transform:translateY(-140%);opacity:0}
 body.imm #tools{transform:translate(-200px,-50%);opacity:0}
-body.imm #cap{opacity:0;transform:translateY(30px)}body.imm #hint{opacity:1;transform:translate(-50%,0)}
+body.imm #cap{opacity:0;transform:translateY(30px)}
+body.imm #hint{opacity:1;transform:translate(-50%,0);color:#f7fbff;background:rgba(6,16,28,.78);border:1px solid rgba(255,255,255,.35);padding:8px 16px;border-radius:999px;text-shadow:none;letter-spacing:.4px}
 
 
 /* Behavior / action chips */
@@ -138,7 +143,7 @@ body.imm #actions{opacity:0;transform:translateY(20px);pointer-events:none}
   }
   body.nav-open #backdrop{opacity:1;pointer-events:auto}
   #left{
-    top:0;bottom:0;left:0;width:min(300px,88vw);
+    top:0;bottom:0;left:0;width:min(250px,52vw);
     border-radius:0 20px 20px 0;
     padding:calc(18px + env(safe-area-inset-top,0px)) 18px calc(18px + env(safe-area-inset-bottom,0px));
     transform:translateX(-105%);opacity:1;
@@ -161,25 +166,34 @@ body.imm #actions{opacity:0;transform:translateY(20px);pointer-events:none}
   .card i{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:78px}
 
   #tools{
-    left:auto;right:calc(12px + env(safe-area-inset-right,0px));
-    top:auto;bottom:calc(36vh + 18px + env(safe-area-inset-bottom,0px));
-    transform:none;flex-direction:row;gap:8px;z-index:9;
+    left:12px;right:12px;
+    top:auto;bottom:calc(36vh + 8px + env(safe-area-inset-bottom,0px));
+    transform:none;flex-direction:row;justify-content:center;gap:8px;z-index:9;
   }
   #tools button{width:40px;height:40px;font-size:16px}
   #tools button#bScale{min-width:52px;height:40px;font-size:11px;padding:0 8px;letter-spacing:0}
-  #scaleHint{bottom:calc(36vh + 72px + env(safe-area-inset-bottom,0px));font-size:12px}
-  body.sheet-open #tools{bottom:calc(70vh + 14px + env(safe-area-inset-bottom,0px))}
+  #scaleHint{
+    bottom:calc(36vh + 178px + env(safe-area-inset-bottom,0px));
+    font-size:12px;white-space:normal;text-align:center;max-width:min(92vw,420px);
+    border-radius:16px;line-height:1.45;
+  }
+  body.sheet-open #tools{bottom:calc(70vh + 8px + env(safe-area-inset-bottom,0px))}
+  body.sheet-open #scaleHint{bottom:calc(70vh + 178px + env(safe-area-inset-bottom,0px))}
   body.imm #tools{transform:translateY(40px);opacity:0}
 
   #cap{
-    /* keep clear of the 4 tool buttons on the right (4×40 + 3×8 gap + margins) */
-    left:12px;right:calc(260px + env(safe-area-inset-right,0px));text-align:left;
-    bottom:calc(36vh + 8px + env(safe-area-inset-bottom,0px));
+    left:12px;right:12px;text-align:center;
+    bottom:calc(36vh + 58px + env(safe-area-inset-bottom,0px));
   }
-  #cap .deg{justify-content:flex-start}
+  #cap .deg{justify-content:center}
   #loader{top:30vh;min-width:0;width:min(300px,78vw)}
-  body.sheet-open #cap{bottom:calc(70vh + 8px + env(safe-area-inset-bottom,0px))}
-  #caption{font-size:15px;letter-spacing:.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  body.sheet-open #cap{bottom:calc(70vh + 58px + env(safe-area-inset-bottom,0px))}
+  #caption{
+    font-size:15px;letter-spacing:.5px;
+    white-space:normal;overflow:hidden;text-overflow:unset;
+    display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;
+    line-height:1.45;
+  }
   .deg{margin-top:6px;font-size:10px;letter-spacing:1px}
   .ring{width:20px;height:20px}
   #dot{width:5px;height:5px;margin:-2.5px}
@@ -230,7 +244,7 @@ body.imm #actions{opacity:0;transform:translateY(20px);pointer-events:none}
 
   #actions{
     left:12px;right:12px;
-    bottom:calc(36vh + 72px + env(safe-area-inset-bottom,0px));
+    bottom:calc(36vh + 132px + env(safe-area-inset-bottom,0px));
     flex-wrap:nowrap;
     justify-content:flex-start;
     overflow-x:auto;
@@ -243,7 +257,7 @@ body.imm #actions{opacity:0;transform:translateY(20px);pointer-events:none}
   }
   #actions::-webkit-scrollbar{display:none}
   #actions button{font-size:11px;padding:6px 12px}
-  body.sheet-open #actions{bottom:calc(70vh + 72px + env(safe-area-inset-bottom,0px))}
+  body.sheet-open #actions{bottom:calc(70vh + 132px + env(safe-area-inset-bottom,0px))}
   body.imm #actions{opacity:0;pointer-events:none}
 }
 
@@ -256,17 +270,19 @@ body.imm #actions{opacity:0;transform:translateY(20px);pointer-events:none}
   .card b{font-size:12px}
   #right{max-height:34vh;padding:4px 14px calc(12px + env(safe-area-inset-bottom,0px))}
   body.sheet-open #right{max-height:70vh}
-  #tools{bottom:calc(34vh + 14px + env(safe-area-inset-bottom,0px));gap:6px}
-  body.sheet-open #tools{bottom:calc(70vh + 12px + env(safe-area-inset-bottom,0px))}
-  #cap{bottom:calc(34vh + 6px + env(safe-area-inset-bottom,0px))}
-  body.sheet-open #cap{bottom:calc(70vh + 6px + env(safe-area-inset-bottom,0px))}
+  #tools{bottom:calc(34vh + 8px + env(safe-area-inset-bottom,0px));gap:6px}
+  body.sheet-open #tools{bottom:calc(70vh + 8px + env(safe-area-inset-bottom,0px))}
+  #cap{bottom:calc(34vh + 56px + env(safe-area-inset-bottom,0px))}
+  body.sheet-open #cap{bottom:calc(70vh + 56px + env(safe-area-inset-bottom,0px))}
   #caption{font-size:13px}
+  #scaleHint{bottom:calc(34vh + 168px + env(safe-area-inset-bottom,0px))}
+  body.sheet-open #scaleHint{bottom:calc(70vh + 168px + env(safe-area-inset-bottom,0px))}
   #info h1,#title{font-size:22px}
   #menuBtn{width:40px;height:40px}
   #hint{bottom:calc(34vh + 48px + env(safe-area-inset-bottom,0px))}
   body.sheet-open #hint{bottom:calc(70vh + 48px + env(safe-area-inset-bottom,0px))}
-  #actions{bottom:calc(34vh + 64px + env(safe-area-inset-bottom,0px))}
-  body.sheet-open #actions{bottom:calc(70vh + 64px + env(safe-area-inset-bottom,0px))}
+  #actions{bottom:calc(34vh + 124px + env(safe-area-inset-bottom,0px))}
+  body.sheet-open #actions{bottom:calc(70vh + 124px + env(safe-area-inset-bottom,0px))}
 }
 
 /* ========== JS fallback: body.mobile (Safari "Request Desktop Website") ==========
@@ -289,7 +305,7 @@ body.mobile #backdrop{
 body.mobile.nav-open #backdrop{opacity:1;pointer-events:auto}
 body.mobile #left{
   top:0 !important;bottom:0 !important;left:0 !important;
-  width:min(300px,88vw) !important;
+  width:min(250px,52vw) !important;
   border-radius:0 20px 20px 0;
   padding:calc(18px + env(safe-area-inset-top,0px)) 18px calc(18px + env(safe-area-inset-bottom,0px));
   transform:translateX(-105%);opacity:1;
@@ -312,24 +328,32 @@ body.mobile .card b{font-size:13px}
 body.mobile .card i{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:78px}
 
 body.mobile #tools{
-  left:auto;right:calc(12px + env(safe-area-inset-right,0px));
-  top:auto;bottom:calc(36vh + 18px + env(safe-area-inset-bottom,0px));
-  transform:none;flex-direction:row;gap:8px;z-index:9;
+  left:12px;right:12px;
+  top:auto;bottom:calc(36vh + 8px + env(safe-area-inset-bottom,0px));
+  transform:none;flex-direction:row;justify-content:center;gap:8px;z-index:9;
 }
 body.mobile #tools button{width:40px;height:40px;font-size:16px}
 body.mobile #tools button#bScale{min-width:52px;height:40px;font-size:11px;padding:0 8px;letter-spacing:0}
-body.mobile #scaleHint{bottom:calc(36vh + 72px + env(safe-area-inset-bottom,0px));font-size:12px}
-body.mobile.sheet-open #tools{bottom:calc(70vh + 14px + env(safe-area-inset-bottom,0px))}
-body.mobile.sheet-open #scaleHint{bottom:calc(70vh + 72px + env(safe-area-inset-bottom,0px))}
+body.mobile #scaleHint{
+  bottom:calc(36vh + 178px + env(safe-area-inset-bottom,0px));
+  font-size:12px;white-space:normal;text-align:center;max-width:min(92vw,420px);
+  border-radius:16px;line-height:1.45;
+}
+body.mobile.sheet-open #tools{bottom:calc(70vh + 8px + env(safe-area-inset-bottom,0px))}
+body.mobile.sheet-open #scaleHint{bottom:calc(70vh + 178px + env(safe-area-inset-bottom,0px))}
 body.mobile.imm #tools{transform:translateY(40px);opacity:0}
 
 body.mobile #cap{
-  /* keep clear of the 4 tool buttons on the right */
-  left:12px;right:calc(260px + env(safe-area-inset-right,0px));text-align:left;
-  bottom:calc(36vh + 8px + env(safe-area-inset-bottom,0px));
+  left:12px;right:12px;text-align:center;
+  bottom:calc(36vh + 58px + env(safe-area-inset-bottom,0px));
 }
-body.mobile.sheet-open #cap{bottom:calc(70vh + 8px + env(safe-area-inset-bottom,0px))}
-body.mobile #caption{font-size:15px;letter-spacing:.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body.mobile.sheet-open #cap{bottom:calc(70vh + 58px + env(safe-area-inset-bottom,0px))}
+body.mobile #caption{
+  font-size:15px;letter-spacing:.5px;
+  white-space:normal;overflow:hidden;text-overflow:unset;
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;
+  line-height:1.45;
+}
 body.mobile .deg{margin-top:6px;font-size:10px;letter-spacing:1px}
 body.mobile .ring{width:20px;height:20px}
 body.mobile #dot{width:5px;height:5px;margin:-2.5px}
@@ -380,7 +404,7 @@ body.mobile.imm #hint{opacity:1;transform:translate(-50%,0)}
 
 body.mobile #actions{
   left:12px;right:12px;
-  bottom:calc(36vh + 72px + env(safe-area-inset-bottom,0px));
+  bottom:calc(36vh + 132px + env(safe-area-inset-bottom,0px));
   flex-wrap:nowrap;
   justify-content:flex-start;
   overflow-x:auto;
@@ -393,7 +417,7 @@ body.mobile #actions{
 }
 body.mobile #actions::-webkit-scrollbar{display:none}
 body.mobile #actions button{font-size:11px;padding:6px 12px}
-body.mobile.sheet-open #actions{bottom:calc(70vh + 72px + env(safe-area-inset-bottom,0px))}
+body.mobile.sheet-open #actions{bottom:calc(70vh + 132px + env(safe-area-inset-bottom,0px))}
 body.mobile.imm #actions{opacity:0;pointer-events:none}
 
 
