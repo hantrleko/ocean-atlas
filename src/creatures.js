@@ -238,8 +238,8 @@ function fetchTemplate(id, onProgress) {
 /** Approximate compressed sizes (bytes) — progress fallback when the server omits Content-Length. */
 const MODEL_BYTES = {
   angler: 466e3, barreleye: 296e3, dumbo: 541e3, gulper: 563e3, hammer: 373e3, jelly: 250e3, nautilus: 445e3, physalia: 312e3, turtle: 607e3, vampire: 711e3, whale: 480e3,
-  great_white: 1705576, manta: 1297932, frilled_shark: 2351492, oarfish: 1614508, clownfish: 1959668, seahorse: 1919132,
-  sunfish: 1720144, blobfish: 1808484, coelacanth: 1751404, orca: 1344704, dolphin: 1576744, sperm_whale: 1868988,
+  great_white: 1677532, manta: 1297932, frilled_shark: 2351492, oarfish: 1614508, clownfish: 1959668, seahorse: 1919132,
+  sunfish: 1720144, blobfish: 1808484, coelacanth: 1751404, orca: 1344704, dolphin: 1543192, sperm_whale: 1868988,
   leatherback: 2662552, giant_squid: 2212908, octopus: 1969256, lionsmane: 3260888, comb_jelly: 3109988,
   spider_crab: 2454764, mantis_shrimp: 2889640, giant_isopod: 3105960, starfish: 2855076, urchin: 2140244,
 };
