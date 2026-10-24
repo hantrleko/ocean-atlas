@@ -16,7 +16,7 @@
 
 八件旗舰在打开那一个瞬间时各播一句旁白（`public/audio/vo-<id>.mp3`），可点「跳过旁白」，跟右下角的总静音走，不循环，也不对另外二十五种念。抹香鲸和大王乌贼对看时响一声，棱皮龟和狮鬃水母对看时另响一声。走进极地借展（座头鲸、棱皮龟）时有一声短的「借展」耳标。四翼都盖过戳再回来，声音开着时，每次打开页面轻声一句「欢迎回来」；同一会话里护照再打开也不会重复。
 
-换季只改 `src/journey.js` 里的 `SEASON`：名称、3–5 个停靠、`amb`（环境音 key）、`loanSting`（借展耳标文件名）、`trailer`（可选预告路径，默认 `media/season-trailer.mp4`）。文件还不在 `public/media/` 时，预告按钮不出现，也不挡开馆。户籍和对看表不用为换季重写。
+换季只改 `src/journey.js` 里的 `SEASON`：名称、3–5 个停靠、`amb`（环境音 key）、`loanSting`（借展耳标文件名）、`trailer`（可选预告路径，默认 `media/season-trailer.mp4`）、`poster`（门厅静帧）。文件还不在 `public/media/` 时，门厅卡片和换季条按钮都不出现，也不挡开馆。卡片只是入口：点按才在对话框里播放，不自动播放，也不循环。馆内静音时预告跟着静音。户籍和对看表不用为换季重写。
 
 海马、真蛸、大王乌贼、多棘海盘车已换上加大振幅的骨骼剪辑，行为 id 与剪辑名一致（海马 grip / brood / sip / dance，真蛸 camouflage / ink / squeeze / probe，大王乌贼 lunge / jet / duel，海盘车 crawl / evert / regenerate）。抹香鲸「喀哒定位」仍几乎不动，页面额外带动下颌。本仓库没有 blend 文件。
 
