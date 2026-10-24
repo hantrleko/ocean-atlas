@@ -201,3 +201,194 @@ export const BEHAVIORS = {
 
 export function behaviorsFor(id) { return BEHAVIORS[id] || BEHAVIORS.nautilus; }
 export function behaviorLabelFor(id, bid) { return behaviorsFor(id).find(b => b.id === bid)?.label || bid; }
+
+/** Short line under the stage while that behavior is showing. Empty → species blurb. */
+const BEHAVIOR_CAPTION = {
+  angler: {
+    ambush: '它伏在黑暗里，只留一盏冷灯。',
+    lure: '饵球轻轻摆，像在跟路过的鱼打招呼。',
+    strike: '嘴猛地张开，把光和猎物一起吞进去。',
+    swim: '它慢慢挪开，头上的灯还在摇。',
+  },
+  whale: {
+    cruise: '长鳍像翼，它沿着自己的航线慢慢游。',
+    breach: '整条身体跃出水面，再砸回海里。',
+    lobtail: '尾鳍高高举起，然后拍下去。',
+    blow: '喷气孔喷出一团雾，它换了一口气。',
+    song: '头朝下竖在水里，歌声传得很远。',
+  },
+  turtle: {
+    swim: '前肢像桨，一下一下把水拨开。',
+    breathe: '它浮上水面，探出头换气。',
+    graze: '低头啃食海草，像在草原上吃草。',
+    rest: '停在水层里，四肢松松地垂着。',
+  },
+  dumbo: {
+    flap: '一对耳鳍扇动，像在水里飞行。',
+    hover: '它悬在海底上方，几乎不动。',
+    reach: '触腕向前探，去够落在泥上的食物。',
+    crawl: '贴着海底，一点一点往前挪。',
+  },
+  vampire: {
+    drift: '斗篷张开，它在缺氧层里慢慢漂。',
+    snow: '细长的丝接着往下掉的海洋雪。',
+    cloak: '腕间膜翻过来，身体缩成一颗球。',
+    flee: '它喷出一股水，头也不回地逃开。',
+  },
+  barreleye: {
+    hover: '透明的头停在水里，眼睛朝上。',
+    gaze: '管状眼转了个方向，望向头顶的光。',
+    strike: '它突然上冲，去咬头顶游过的影子。',
+    cruise: '身体放平，慢慢往前巡。',
+  },
+  gulper: {
+    swim: '细长的身体像蛇一样左右摆。',
+    gape: '嘴张成一张网，等着食物自己游进来。',
+    tailglow: '尾端的小灯亮着，在身后晃。',
+    drift: '它竖直挂在水里，像一根悬着的线。',
+  },
+  nautilus: {
+    jet: '漏斗喷水，螺壳倒着往后退。',
+    rise: '夜里它把气室调轻，慢慢上浮。',
+    sink: '白天加重身体，沉回暗处。',
+    forage: '几十条触手在螺口前面摸索。',
+  },
+  jelly: {
+    pulse: '伞体一张一合，像月亮在呼吸。',
+    drift: '它把身体交给水流，自己几乎不划。',
+    feed: '口腕伸进水里，捞过往的小动物。',
+  },
+  physalia: {
+    sail: '浮囊上的冠迎着风，整群往前漂。',
+    bob: '浪头把蓝帽子托起来，又放下。',
+    hunt: '水下的触手张开，等着碰到猎物。',
+    roll: '它把浮囊浸进水里，润一润。',
+  },
+  hammer: {
+    patrol: '锤头左右扫过，沿着海岸巡游。',
+    scan: '宽头贴着沙底，电感受器在找埋着的鱼。',
+    pin: '头翼压住沙里的魟，再一口咬住。',
+    sideswim: '身体侧过来，继续往前游。',
+  },
+  great_white: {
+    breach: '它从光的下面冲上来，整条身体离开海面。',
+    cruise: '灰色的背贴着水面下，慢慢绕圈。',
+    bite: '嘴张开，几排锯齿一起合上。',
+    roll: '它侧过身，露出那只黑眼睛。',
+  },
+  manta: {
+    glide: '两翼几乎不动，它在水里滑翔。',
+    barrel: '翻了个身，把浮游生物滤进嘴里。',
+    hover: '停在清洁站，让小鱼啄掉寄生虫。',
+    leap: '宽翅膀拍出水面，再落回去。',
+  },
+  frilled_shark: {
+    slither: '身体像鳗，一节一节地摆出去。',
+    lunge: '它把身体弹直，咬向前面的猎物。',
+    gillflare: '鳃裂的褶边张开，又慢慢合上。',
+  },
+  oarfish: {
+    hover: '银色的带子竖在暮光里，头朝上。',
+    undulate: '红色背鳍从头到尾一直在波动。',
+    dive: '它收起身体，迅速往更深的地方去。',
+  },
+  clownfish: {
+    nestle: '它钻进海葵的触手里，像回家。',
+    fan: '停在卵旁边，胸鳍把新鲜的水扇过去。',
+    chase: '有谁靠得太近，它就冲出去赶走。',
+  },
+  seahorse: {
+    grip: '尾巴轻轻勾住一根海草，身体稳住。',
+    brood: '雄鱼的育儿囊微微鼓起，孩子在里面。',
+    sip: '管状的吻猛地一吸，小虾已经不见了。',
+    dance: '两尾海马面对面，在水里慢慢转。',
+  },
+  sunfish: {
+    bask: '圆盘侧躺在海面上，把太阳晒进身体。',
+    stroke: '背鳍和臀鳍一起划，推着圆盘前进。',
+    dive: '它离开海面，往下潜去找水母。',
+  },
+  blobfish: {
+    drift: '软软的身体贴着海底，几乎不费力。',
+    gulp: '嘴张开，把游到面前的东西吞进去。',
+    collapse: '压力一消失，身体就塌成一团果冻。',
+  },
+  coelacanth: {
+    hover: '头朝下，它在洞里倒立着漂。',
+    lobefin: '肉鳍交替摆动，像在水里走路。',
+    cave: '它退回岩洞的阴影里，停住。',
+  },
+  orca: {
+    wavewash: '尾鳍拍打浮冰边缘，浪把海豹冲下来。',
+    hunt: '黑白的家族排开，围住同一条鱼。',
+    breach: '它整条跃出水面，再重重落下。',
+    spyhop: '头垂直探出水面，看一眼冰上。',
+  },
+  dolphin: {
+    leap: '它跃出船首的浪，在空中弯成一道弧。',
+    surf: '身体贴着浪坡往前冲。',
+    echolocate: '额隆发出一串咔嗒声，去找前面的鱼。',
+    bubble: '它吐出一个会自己打转的泡泡环。',
+  },
+  sperm_whale: {
+    sleep: '巨大的头朝上竖着，它就这样睡觉。',
+    dive: '尾鳍举起，身体沉向乌贼所在的深处。',
+    blow: '偏在左边的喷气孔喷出斜斜的一团雾。',
+    click: '额里的鲸蜡器聚焦喀哒声，去量前方的距离。',
+  },
+  leatherback: {
+    cruise: '它用长鳍划过整片大洋，不停。',
+    dive: '跟着水母往下潜，背甲的纵棱压住水。',
+    nest: '爬上夜色里的沙滩，去把卵埋好。',
+  },
+  giant_squid: {
+    lunge: '两条长腕伸出去，末端的吸盘张开。',
+    jet: '外套膜一收，它往后弹开。',
+    duel: '腕缠上去，巨大的眼睛盯着抹香鲸。',
+  },
+  octopus: {
+    camouflage: '皮肤一眨眼，换成沙、藻和石头的颜色。',
+    ink: '一团墨喷出来，它已经从另一头离开。',
+    squeeze: '骨头不必跟着走，身体钻进更窄的缝。',
+    probe: '一条腕先伸过去，尖端在摸那块石头。',
+  },
+  lionsmane: {
+    pulse: '大伞缓慢搏动，冷水被推开一点。',
+    trail: '伞下拖着密密的触手，像一张网。',
+    drift: '它把身体交给海流，往冰缘漂。',
+  },
+  comb_jelly: {
+    shimmer: '八列栉板拍过，光折成流动的虹。',
+    gulp: '没有触手，它张大嘴吞下另一只栉水母。',
+    cruise: '嘴还张着，身体已经往前游。',
+  },
+  spider_crab: {
+    walk: '细长的步足像枯枝，一下一下地挪。',
+    molt: '旧壳裂开，更软的身体从里面退出来。',
+    cloak: '它把藻和海绵别在壳上，自己隐进去。',
+  },
+  mantis_shrimp: {
+    punch: '锤节弹出，甲壳在空化气泡里碎开。',
+    guard: '它守在洞口，复眼跟着外面的影子转。',
+    display: '彩色的附肢展开，是给同类看的。',
+  },
+  giant_isopod: {
+    ball: '受到惊扰，分节的背甲卷成一颗球。',
+    scavenge: '它爬向沉到海底的尸体，慢慢吃。',
+    fast: '吃完这一顿，它可以好几年不再开口。',
+  },
+  starfish: {
+    crawl: '管足一排排吸住岩石，身体往前爬。',
+    evert: '胃翻出体外，包住合不拢的贝。',
+    regenerate: '断掉的腕还在，新的一截慢慢长出来。',
+  },
+  urchin: {
+    spin: '棘刺转向威胁来的方向。',
+    graze: '腹面的五颗牙刮过海藻。',
+    tube: '管足把刺球一点点搬到下一丛藻上。',
+  },
+};
+
+export function behaviorCaption(speciesId, behaviorId) {
+  return BEHAVIOR_CAPTION[speciesId]?.[behaviorId] || '';
+}

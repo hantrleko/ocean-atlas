@@ -414,12 +414,15 @@ void main(){vec3 v=normalize(cameraPosition-vW);float fr=pow(1.-abs(v.y),3.);
   }
   const tmpC = new THREE.Color();
   /** Per-frame: blend, push uniforms, react to behaviour. Returns light tint info for main.js. */
-  function update(t, dt, { beh, cur, lights, fog, renderer }) {
+  function update(t, dt, { beh, cur, lights, fog, renderer, camDist = 12 }) {
     T.value = t;
     const k = 1 - Math.exp(-dt * 2.2);
     for (const n of NUM) st[n] += ((target[n] ?? 0) - st[n]) * k;
     for (const n of COL) st[n].lerp(tmpC.set(target[n] ?? 0), k);
     const lum = dark ? 0.62 : 1;
+    // Keep the backdrop sphere around the camera. Tiny species in scale mode
+    // pull the camera outside the old radius and the page background shows as a hard circle.
+    bg.scale.setScalar(Math.max(1, camDist / 16));
     bgU.top.value.copy(st.top); bgU.hor.value.copy(st.hor); bgU.bot.value.copy(st.bot);
     bgU.surf.value = st.surf; bgU.sun.value = st.sun; bgU.sky.value = st.sky; bgU.lum.value = lum;
     fog.color.copy(st.hor).multiplyScalar(lum); fog.density = st.fog;

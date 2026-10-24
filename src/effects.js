@@ -16,13 +16,13 @@ let TEX = null; const tex = () => (TEX ||= glowTexture());
 export function makeLureGlow(raw, outer) {
   let skinned = null; raw.traverse(o => { if (o.isSkinnedMesh && !skinned) skinned = o; });
   if (!skinned) return null;
-  const holder = new THREE.Group(); outer.add(holder);
+  const holder = new THREE.Group(); holder.userData.noDetail = true; outer.add(holder);
   const mat = new THREE.SpriteMaterial({ map: tex(), color: 0x7ff6ff, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true });
   const halo = new THREE.Sprite(mat); holder.add(halo);
   const core = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex(), color: 0xeaffff, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); holder.add(core);
   const light = new THREE.PointLight(0x66f0ff, 0, 3, 1.5); holder.add(light);
   const stalkMat = new THREE.SpriteMaterial({ map: tex(), color: 0x9ff8ff, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true });
-  const stalk = new THREE.Sprite(stalkMat); outer.add(stalk);
+  const stalk = new THREE.Sprite(stalkMat); stalk.userData.noDetail = true; outer.add(stalk);
   let vi = -1, si = -1, lvl = 0; const _w = new THREE.Vector3();
   const LEVEL = { lure: 1, ambush: 0.6, strike: 0.25, swim: 0.35 };
   const posAttr = skinned.geometry.attributes.position;
@@ -105,36 +105,38 @@ export function makeSpout(raw, outer) {
 }
 
 
-/** Dark oral cavity: a radial-gradient disc in the gape so the open mouth reads as a deep throat. */
+/**
+ * Soft hint of a throat. The fish is only ~0.5 units wide; the old opaque disc
+ * (scale ~0.2) covered the whole head and blew the close-up out to white.
+ * Kept as a small transparent spot, and tagged so the detail camera skips it.
+ */
 export function makeMouthCavity(raw) {
   const head = raw.getObjectByName('spine1');
   if (!head) return null;
-  const g = new THREE.Group(); head.add(g);
-  const cv = document.createElement('canvas'); cv.width = cv.height = 256;
+  const g = new THREE.Group();
+  g.name = 'mouth-cavity';
+  g.userData.noDetail = true;
+  head.add(g);
+  const cv = document.createElement('canvas'); cv.width = cv.height = 128;
   const x = cv.getContext('2d');
-  const grd = x.createRadialGradient(128, 128, 8, 128, 128, 128);
-  grd.addColorStop(0, 'rgb(0,0,0)');
-  grd.addColorStop(0.35, 'rgb(8,2,4)');
-  grd.addColorStop(0.7, 'rgb(28,10,12)');
-  grd.addColorStop(1, 'rgb(40,18,16)');
-  x.fillStyle = grd; x.fillRect(0, 0, 256, 256);
+  const grd = x.createRadialGradient(64, 64, 2, 64, 64, 64);
+  grd.addColorStop(0, 'rgba(0,0,0,0.45)');
+  grd.addColorStop(0.45, 'rgba(28,8,10,0.22)');
+  grd.addColorStop(1, 'rgba(40,16,14,0)');
+  x.fillStyle = grd; x.fillRect(0, 0, 128, 128);
   const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
-  const mat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide, depthWrite: true });
-  // Disc in the XY plane of the bone, facing ±Y (snout axis); rotate so it faces the snout
-  const disc = new THREE.Mesh(new THREE.CircleGeometry(1, 32), mat);
-  disc.rotation.x = Math.PI / 2; // face along ±Y
+  const mat = new THREE.MeshBasicMaterial({
+    map: tex, transparent: true, opacity: 0.7, depthWrite: false, side: THREE.DoubleSide,
+  });
+  const disc = new THREE.Mesh(new THREE.CircleGeometry(1, 24), mat);
+  disc.rotation.x = Math.PI / 2;
   g.add(disc);
-  // Slightly smaller, darker disc pushed further into the throat for parallax
-  const deep = new THREE.Mesh(new THREE.CircleGeometry(0.7, 24), new THREE.MeshBasicMaterial({
-    color: 0x000000, side: THREE.DoubleSide,
-  }));
-  deep.rotation.x = Math.PI / 2; deep.position.set(0, 0.12, 0); g.add(deep);
   let ready = false;
   return function update(_t, behaviorId) {
-    if (!ready) { g.position.set(0, -0.13, -0.02); g.scale.setScalar(0.18); ready = true; }
-    const open = behaviorId === 'strike' ? 1 : behaviorId === 'lure' ? 0.55 : behaviorId === 'ambush' ? 0.28 : 0.1;
-    g.visible = open > 0.1;
-    g.scale.setScalar(0.15 + 0.06 * open);
+    if (!ready) { g.position.set(0, -0.07, 0); ready = true; }
+    const open = behaviorId === 'strike' ? 1 : behaviorId === 'lure' ? 0.4 : 0;
+    g.visible = open > 0.2;
+    g.scale.setScalar(0.022 + 0.016 * open);
   };
 }
 

@@ -238,7 +238,7 @@ function fetchTemplate(id, onProgress) {
 /** Approximate compressed sizes (bytes) — progress fallback when the server omits Content-Length. */
 const MODEL_BYTES = {
   angler: 466e3, barreleye: 296e3, dumbo: 541e3, gulper: 563e3, hammer: 373e3, jelly: 250e3, nautilus: 445e3, physalia: 312e3, turtle: 607e3, vampire: 711e3, whale: 480e3,
-  great_white: 1705576, manta: 1297932, frilled_shark: 2351492, oarfish: 1614508, clownfish: 1959668, seahorse: 1931980,
+  great_white: 1705576, manta: 1297932, frilled_shark: 2351492, oarfish: 1614508, clownfish: 1959668, seahorse: 1919132,
   sunfish: 1720144, blobfish: 1808484, coelacanth: 1751404, orca: 1344704, dolphin: 1576744, sperm_whale: 1868988,
   leatherback: 2662552, giant_squid: 2212908, octopus: 1969256, lionsmane: 3260888, comb_jelly: 3109988,
   spider_crab: 2454764, mantis_shrimp: 2889640, giant_isopod: 3105960, starfish: 2855076, urchin: 2140244,
@@ -352,15 +352,21 @@ function sampleInto(outer, raw, out, per) {
     }
   });
 }
-function measureFitRigged(outer, raw, clips) {
+function measureFitRigged(outer, raw, clips, steps = 8, per = 500) {
   const out = [], m = new THREE.AnimationMixer(raw);
   for (const c of clips) {
     const a = m.clipAction(c); a.play();
-    for (let k = 0; k < 8; k++) { m.setTime(c.duration * k / 8); sampleInto(outer, raw, out, 500); }
+    const n = Math.max(1, steps);
+    for (let k = 0; k < n; k++) { m.setTime(c.duration * k / n); sampleInto(outer, raw, out, per); }
     a.stop();
   }
   m.stopAllAction(); m.uncacheRoot(raw);
   return { pts: new Float32Array(out), pad: 0.03 };
+}
+function cheapFit(outer, raw) {
+  const out = [];
+  sampleInto(outer, raw, out, 220);
+  return { pts: new Float32Array(out), pad: 0.08 };
 }
 function measureFitStatic(outer, raw, id, ctrl) {
   const out = [];
@@ -384,6 +390,55 @@ function cloneMaterials(root) {
     if (Array.isArray(o.material)) o.material = o.material.map(m => m.clone());
     else o.material = o.material.clone();
   });
+}
+
+/** Moon jelly GLB is an opaque Tripo shell. Pull it toward a readable bell. */
+function softenMoonJelly(root) {
+  root.traverse(o => {
+    if (!o.isMesh || !o.material) return;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    mats.forEach(m => {
+      m.transparent = true;
+      m.opacity = Math.min(typeof m.opacity === 'number' ? m.opacity : 1, 0.46);
+      m.depthWrite = false;
+      m.side = THREE.DoubleSide;
+      if (typeof m.roughness === 'number') m.roughness = Math.min(m.roughness, 0.22);
+      if (m.emissive) {
+        m.emissive.set(0xd4f2ff);
+        m.emissiveIntensity = Math.max(m.emissiveIntensity || 0, 0.22);
+        m.userData.base = m.emissiveIntensity;
+        glowMats.push(m);
+      }
+      m.needsUpdate = true;
+    });
+  });
+}
+
+/** «变色伪装»: cycle the body tint so the clip reads even when the GLB motion is subtle. */
+function makeOctopusCamo(raw) {
+  const mats = [];
+  raw.traverse(o => {
+    if (!o.isMesh || !o.material) return;
+    const list = Array.isArray(o.material) ? o.material : [o.material];
+    list.forEach(m => {
+      if (!m.color) return;
+      if (!m.userData.camoBase) m.userData.camoBase = m.color.clone();
+      mats.push(m);
+    });
+  });
+  const cols = [0xc4623e, 0x6e8f3e, 0xe4d2a4, 0x3a322c, 0x8d4a38].map(c => new THREE.Color(c));
+  const tmp = new THREE.Color();
+  return function update(t, behaviorId) {
+    const on = behaviorId === 'camouflage';
+    mats.forEach(m => {
+      const base = m.userData.camoBase;
+      if (!on) { m.color.lerp(base, 0.1); return; }
+      const u = t * 0.7;
+      const i = Math.floor(u) % cols.length;
+      tmp.copy(cols[i]).lerp(cols[(i + 1) % cols.length], u - Math.floor(u));
+      m.color.lerp(tmp, 0.28);
+    });
+  };
 }
 
 /** Map UI behavior id → AnimationClip (clip names == behavior ids, authored in Blender). */
@@ -451,7 +506,12 @@ function makeRiggedUpdater(raw, outer, id, mixer, clips) {
   const list = behaviorsFor(id).filter(b => clips[b.id]);
   let autoIdx = 0, autoT0 = null;
   playClip(clipForBehavior(id, list[0]?.id, clips), 0, list[0]?.id);
-  const fx = [id === 'angler' && makeLureGlow(raw, outer), id === 'angler' && makeMouthCavity(raw), id === 'whale' && makeSpout(raw, outer)].filter(Boolean);
+  const fx = [
+    id === 'angler' && makeLureGlow(raw, outer),
+    id === 'angler' && makeMouthCavity(raw),
+    id === 'whale' && makeSpout(raw, outer),
+    id === 'octopus' && makeOctopusCamo(raw),
+  ].filter(Boolean);
   const activeId = () => (mode === 'auto' ? list[autoIdx]?.id : mode);
   /** Camera hint for the current behaviour ({yaw, pitch, dist, lookY}) — consumed by main.js. */
   const trackBone = raw.getObjectByName(id === 'whale' ? 'spine3' : 'root');
@@ -514,6 +574,7 @@ export async function loadCreature(id, onProgress) {
     const useRig = RIGGED_IDS.has(id) && template.animations.length > 0;
     const raw = useRig ? SkeletonUtils.clone(template.scene) : template.scene.clone(true);
     cloneMaterials(raw);
+    if (id === 'jelly') softenMoonJelly(raw);
     const fitSize = frameFor(id).size;
 
     if (useRig) {
@@ -521,10 +582,21 @@ export async function loadCreature(id, onProgress) {
       if (id === 'gulper') brightenDeepSea(raw);
       const mixer = new THREE.AnimationMixer(raw);
       const clips = Object.fromEntries(template.animations.map(a => [a.name, a]));
-      const fit = measureFitRigged(outer, raw, template.animations);
+      // Bind-pose envelope now; the full clip cloud is deferred so a cold switch can paint.
+      const fit = cheapFit(outer, raw);
       const ctrl = makeRiggedUpdater(raw, outer, id, mixer, clips);
+      const refineFit = apply => {
+        const idle = window.requestIdleCallback || (fn => setTimeout(fn, 600));
+        idle(() => {
+          try {
+            const probe = SkeletonUtils.clone(template.scene);
+            const wrapped = wrapModel(probe, fitSize, true);
+            apply(measureFitRigged(wrapped.outer, probe, template.animations, 4, 240));
+          } catch (err) { console.warn('[ocean-atlas] envelope', err?.message || err); }
+        }, { timeout: 2800 });
+      };
       return {
-        fit,
+        fit, refineFit,
         g: outer, raw, up: ctrl.up, setMode: ctrl.setMode, getMode: ctrl.getMode, k, mixer, view: ctrl.view, trackY: ctrl.trackY, active: ctrl.active,
       };
     }

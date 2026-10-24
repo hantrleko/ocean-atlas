@@ -8,7 +8,8 @@ import { build, glowMats, loadCreature, prefetchCreature, isCached, releaseCreat
 import { uniqueBehaviors, behaviorLabel } from './aliveMotion.js';
 import { createEnv, habitatLabel } from './env.js';
 import { createAudio } from './audio.js';
-import { frameFor } from './framing.js';
+import { behaviorCaption } from './behaviors.js';
+import { frameFor, distToContain } from './framing.js';
 import { createDiver, DIVER_HEIGHT_M } from './diver.js';
 import { sizeOf } from './sizes.js';
 
@@ -99,6 +100,19 @@ let scaleOn = false, scaleFit = null, scaleFor = '';
 const diver = createDiver();
 diver.visible = false;
 stage.add(diver);
+const standIn = new THREE.Mesh(
+  new THREE.IcosahedronGeometry(0.78, 1),
+  new THREE.MeshStandardMaterial({
+    color: 0x8fb4c8, emissive: 0x1a4a5a, emissiveIntensity: 0.55,
+    transparent: true, opacity: 0.38, roughness: 0.4, depthWrite: false,
+  })
+);
+standIn.visible = false;
+standIn.name = 'stand-in';
+stage.add(standIn);
+const detailFill = new THREE.PointLight(0xfff6ea, 0, 8, 1.5);
+detailFill.visible = false;
+scene.add(detailFill);
 const _bv = new THREE.Vector3();
 let loadToken = 0;
 const flights = [];
@@ -149,8 +163,9 @@ function ensureGroup(i) {
 }
 
 function navBuild() {
-  const start = +(new URLSearchParams(location.search).get('s') || 0);
-  groupFilter = SPECIES[start]?.group || GROUPS[0].id;
+  // Land on 全部 (all species). The old default was the first species' group,
+  // which hid everything except the five cephalopods.
+  groupFilter = '';
   const counts = {};
   SPECIES.forEach(s => { counts[s.group] = (counts[s.group] || 0) + 1; });
   $('#nav').innerHTML =
@@ -174,9 +189,56 @@ function navBuild() {
   };
   $('#carousel').onclick = e => { const c = e.target.closest('.card'); c && select(+c.dataset.i); };
   renderCarousel();
-  const f = SPECIES[3];
-  $('#featName').textContent = f.name; $('#featLatin').textContent = f.latin;
-  $('#featCap').textContent = f.caption; $('#featGo').onclick = () => select(3);
+  updateFeat(0);
+}
+
+function updateFeat(i) {
+  const f = SPECIES[i];
+  if (!f) return;
+  $('#featName').textContent = f.name;
+  $('#featLatin').textContent = f.latin;
+  $('#featCap').textContent = f.caption;
+  $('#featGo').onclick = () => select(i);
+}
+
+function indexFromSearch(hp) {
+  const id = hp.get('id');
+  if (id) {
+    const i = SPECIES.findIndex(s => s.id === id);
+    if (i >= 0) return i;
+  }
+  const s = hp.get('s');
+  if (s != null && s !== '') {
+    const n = +s;
+    if (Number.isFinite(n)) return Math.min(SPECIES.length - 1, Math.max(0, n));
+  }
+  return 0;
+}
+
+function writeDeepLink(id) {
+  const url = new URL(location.href);
+  if (url.searchParams.get('id') === id && !url.searchParams.has('s')) return;
+  url.searchParams.set('id', id);
+  url.searchParams.delete('s');
+  history.replaceState(null, '', url.pathname + url.search + url.hash);
+}
+
+function syncCaption(species = cur?.s) {
+  const el = $('#caption');
+  if (!el || !species) return;
+  let beh = null;
+  if (cur?.s?.id === species.id) beh = actionMode === 'auto' ? cur.active?.() : actionMode;
+  else if (actionMode !== 'auto') beh = actionMode;
+  const line = beh && beh !== 'auto' ? behaviorCaption(species.id, beh) : '';
+  el.textContent = line || species.caption;
+}
+
+function paintTabs(activeId) {
+  document.querySelectorAll('#actions button').forEach(b => {
+    const on = b.dataset.b === activeId;
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
 }
 
 let actionMode = 'auto'; // UI selection; applied to cur on select / chip click
@@ -189,25 +251,24 @@ function rebuildActions(speciesId) {
     { id: 'auto', label: '自动' },
     ...behaviors.map(b => ({ id: b.id, label: b.label || behaviorLabel(b.id, speciesId) })),
   ];
-  el.innerHTML = chips.map(c =>
-    `<button type="button" role="tab" data-b="${c.id}" class="${c.id === actionMode ? 'on' : ''}">${c.label}</button>`
-  ).join('');
+  el.innerHTML = chips.map(c => {
+    const on = c.id === actionMode;
+    return `<button type="button" role="tab" data-b="${c.id}" class="${on ? 'on' : ''}" aria-selected="${on ? 'true' : 'false'}">${c.label}</button>`;
+  }).join('');
 }
 
 function applyActionMode() {
   if (!cur) return;
   const mode = cur.setMode?.(actionMode) ?? actionMode;
-  // Sync chip .on (in case setMode remapped id)
-  document.querySelectorAll('#actions button').forEach(b => {
-    b.classList.toggle('on', b.dataset.b === (actionMode === 'auto' ? 'auto' : mode));
-  });
+  paintTabs(actionMode === 'auto' ? 'auto' : mode);
+  syncCaption();
 }
 
 $('#actions')?.addEventListener('click', e => {
   const btn = e.target.closest('button[data-b]');
   if (!btn) return;
   actionMode = btn.dataset.b;
-  document.querySelectorAll('#actions button').forEach(b => b.classList.toggle('on', b === btn));
+  paintTabs(actionMode);
   applyActionMode();
 });
 
@@ -222,7 +283,9 @@ function info(s) {
     $('#desc').textContent = s.desc;
     $('#traits').innerHTML = Object.entries(s.traits).map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
     $('#dTitle').textContent = s.detail.title; $('#dText').textContent = s.detail.text;
-    $('#caption').textContent = s.caption;
+    const card = document.querySelector('#info .detail');
+    if (card) card.hidden = !!s.detail.hide;
+    syncCaption(s);
   }, 240);
   markNav();
 }
@@ -238,6 +301,9 @@ async function select(i, instant) {
   scaleFor = s.id;
   diver.visible = false;
   scaleFit = null;
+  refreshScaleHint(s);
+  updateFeat(i);
+  writeDeepLink(s.id);
   rebuildActions(s.id);
   info(s);
   envx.set(s.id, instant);
@@ -249,6 +315,8 @@ async function select(i, instant) {
   let n;
   // Loading overlay: only appears if the model isn't cached and takes >120 ms
   const cached = isCached(s.id);
+  if (!cached) showStandIn(s.id);
+  else hideStandIn();
   const showT = cached ? 0 : setTimeout(() => loader.show(s.name), 120);
   try {
     n = await loadCreature(s.id, f => { if (token === loadToken) loader.set(f); });
@@ -257,7 +325,7 @@ async function select(i, instant) {
     n = build(s.id);
   }
   clearTimeout(showT);
-  if (token === loadToken) loader.hide();
+  if (token === loadToken) { loader.hide(); hideStandIn(); }
   if (token !== loadToken) {
     disposeCloneMaterials(n.g);
     if (!n.g.userData.fromGlb) n.g.traverse(o => { o.geometry?.dispose(); });
@@ -270,12 +338,14 @@ async function select(i, instant) {
   flights.push({ o: n, t: instant ? 1 : 0, out: false });
   cur = n;
   applyActionMode();
-  // Desktop only: warm the next species. Phones keep a single GLB resident.
-  if (!isMobile()) {
-    const nextId = SPECIES[(i + 1) % SPECIES.length].id;
-    const idle = window.requestIdleCallback || (fn => setTimeout(fn, 1200));
-    setTimeout(() => idle(() => { if (token === loadToken) prefetchCreature(nextId); }), 1500);
-  }
+  syncCaption(s);
+  if (s.id === 'giant_squid') refineSquidFrame(n.g);
+  if (n.refineFit) n.refineFit(fit => {
+    if (token !== loadToken || cur !== n) return;
+    n.fit = fit;
+    mobFrame.key = '';
+  });
+  prefetchNeighbors(i, token);
 }
 
 /** Model-load progress overlay (#loader). */
@@ -393,26 +463,48 @@ addEventListener('keydown', e => {
 
 // search
 const q = $('#q'), res = $('#results');
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const match = v => SPECIES.map((s, i) => [s, i]).filter(([s]) => {
   const g = groupById(s.group);
   const hay = (s.name + s.latin + s.en + s.nav + s.tags.join('') + (g ? g.zh + g.note : '')).toLowerCase();
   return v && hay.includes(v.toLowerCase());
 });
+function closeSearch() {
+  res.style.display = 'none';
+  res.innerHTML = '';
+  q.setAttribute('aria-expanded', 'false');
+}
 q.oninput = () => {
-  const m = match(q.value.trim());
-  res.style.display = m.length ? 'block' : 'none';
-  res.innerHTML = m.map(([s, i]) => `<div data-i="${i}">${s.name}<i>${s.latin}</i></div>`).join('');
+  const v = q.value.trim();
+  if (!v) { closeSearch(); return; }
+  const m = match(v);
+  res.style.display = 'block';
+  q.setAttribute('aria-expanded', 'true');
+  if (!m.length) {
+    const shown = v.length > 24 ? `${v.slice(0, 24)}…` : v;
+    res.innerHTML = `<div class="empty" role="status">没有找到「${esc(shown)}」</div>`;
+    return;
+  }
+  res.innerHTML = m.map(([s, i]) => `<div data-i="${i}"><b>${esc(s.name)}</b><i>${esc(s.latin)}</i></div>`).join('');
 };
 res.onclick = e => {
   const d = e.target.closest('div[data-i]');
-  if (d) { select(+d.dataset.i); res.style.display = 'none'; q.value = ''; }
+  if (!d) return;
+  select(+d.dataset.i);
+  q.value = '';
+  closeSearch();
+  q.blur();
 };
 q.onkeydown = e => {
+  if (e.key === 'Escape') { closeSearch(); q.blur(); e.stopPropagation(); return; }
   if (e.key === 'Enter') {
     const m = match(q.value.trim());
-    if (m[0]) { select(m[0][1]); res.style.display = 'none'; q.value = ''; q.blur(); }
+    if (m[0]) { select(m[0][1]); q.value = ''; closeSearch(); q.blur(); }
   }
 };
+document.addEventListener('pointerdown', e => {
+  if (!e.target.closest('.search')) closeSearch();
+});
 $('#bSearch').onclick = () => { setImm(false); tZoom = Math.max(tZoom, 0); if (isMobile()) body.classList.add('sheet-open'); q.focus(); };
 
 const MQ_MOBILE = matchMedia('(max-width:820px)');
@@ -584,29 +676,117 @@ function clearScaleShift() {
   cam.updateProjectionMatrix();
 }
 
-{ // 比例对比：1.75 m 潜水员与当前物种并排
-  const btn = document.getElementById('bScale');
-  const hint = document.getElementById('scaleHint');
-  btn?.addEventListener('click', () => {
-    scaleOn = !scaleOn;
-    btn.classList.toggle('on', scaleOn);
-    btn.setAttribute('aria-pressed', String(scaleOn));
-    btn.title = scaleOn ? '关闭比例对比' : '比例对比';
-    tZoom = 0;
-    if (!scaleOn) clearScaleShift();
-    else if (cur && cur.s.id === scaleFor && !flights.some(f => f.o === cur)) layoutScale();
-    if (hint) {
-      const spec = cur && sizeOf(cur.s.id);
-      hint.textContent = scaleOn && spec
-        ? `比例对比 · 潜水员 ${DIVER_HEIGHT_M.toFixed(2)} 米 · ${cur.s.name}${spec.measure} ${formatMeters(spec.lengthMeters)}`
-        : '';
-      hint.classList.toggle('on', scaleOn);
-    }
+function showStandIn(id) {
+  const hex = THUMB[id] || '#8fb4c8';
+  standIn.material.color.set(hex);
+  standIn.material.emissive.set(hex);
+  standIn.visible = true;
+}
+function hideStandIn() { standIn.visible = false; }
+
+function stageGap() {
+  if (innerWidth <= 820) return 0.92;
+  return Math.max(0.4, (innerWidth - 304 - 378) / innerWidth);
+}
+
+/** Pull the default camera back until the squid's mantle fits the gap between the panels. */
+function refineSquidFrame(obj) {
+  const box = stageBox(obj);
+  if (box.isEmpty()) return;
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const D = distToContain(
+    { x: Math.max(size.x, 0.2) / 2, y: Math.max(size.y, 0.2) / 2, z: Math.max(size.z, 0.2) / 2 },
+    { yaw: rotY, pitch: rotX * 0.5, fov: frameFov, aspect: Math.max(0.6, cam.aspect), gap: stageGap(), pad: 1.22 },
+  );
+  frameDist = Math.max(9.6, D);
+  frameAimX = center.x;
+  frameAimY = center.y + 0.04;
+  dist = frameDist;
+}
+
+function prefetchNeighbors(i, token) {
+  if (isMobile()) return;
+  const list = indicesOf(groupFilter);
+  const pos = list.indexOf(i);
+  if (pos < 0) return;
+  const ids = [1, -1, 2].map(d => list[pos + d]).filter(j => j != null).map(j => SPECIES[j].id);
+  const idle = window.requestIdleCallback || (fn => setTimeout(fn, 700));
+  ids.forEach((id, n) => {
+    setTimeout(() => idle(() => { if (token === loadToken) prefetchCreature(id); }, { timeout: 4000 }), 500 + n * 450);
   });
 }
+
+function sayHint(m) {
+  const hint = $('#sndHint');
+  if (!hint) return;
+  hint.textContent = m;
+  hint.classList.add('on');
+  clearTimeout(sayHint._t);
+  sayHint._t = setTimeout(() => hint.classList.remove('on'), 1800);
+}
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch { ok = false; }
+    ta.remove();
+    return ok;
+  }
+}
+async function shareSpecies() {
+  const s = cur?.s || SPECIES[idx];
+  if (!s) return;
+  const url = new URL(location.href);
+  url.searchParams.set('id', s.id);
+  url.searchParams.delete('s');
+  const data = { title: `${s.name} · 深海图鉴`, text: s.caption, url: url.toString() };
+  if (navigator.share) {
+    try { await navigator.share(data); return; }
+    catch (err) { if (err?.name === 'AbortError') return; }
+  }
+  const ok = await copyText(data.url);
+  sayHint(ok ? '链接已复制' : '无法复制链接');
+}
+$('#bShare')?.addEventListener('click', () => { shareSpecies(); });
+
 function formatMeters(m) {
   if (m >= 1) return `${Number(m.toFixed(m >= 10 ? 0 : 1))} 米`;
   return `${Math.round(m * 100)} 厘米`;
+}
+function refreshScaleHint(species = cur?.s) {
+  const hint = document.getElementById('scaleHint');
+  const btn = document.getElementById('bScale');
+  if (btn) {
+    btn.classList.toggle('on', scaleOn);
+    btn.setAttribute('aria-pressed', String(scaleOn));
+    btn.title = scaleOn ? '关闭比例对比' : '比例对比';
+  }
+  if (!hint) return;
+  const spec = species && sizeOf(species.id);
+  hint.textContent = scaleOn && spec
+    ? `比例对比 · 潜水员 ${DIVER_HEIGHT_M.toFixed(2)} 米 · ${species.name}${spec.measure} ${formatMeters(spec.lengthMeters)}`
+    : '';
+  hint.classList.toggle('on', !!(scaleOn && spec));
+}
+{ // 比例对比：1.75 m 潜水员与当前物种并排
+  const btn = document.getElementById('bScale');
+  btn?.addEventListener('click', () => {
+    scaleOn = !scaleOn;
+    tZoom = 0;
+    if (!scaleOn) clearScaleShift();
+    else if (cur && cur.s.id === scaleFor && !flights.some(f => f.o === cur)) layoutScale();
+    refreshScaleHint();
+  });
 }
 /**
  * Phones: the free stage is the strip between the species carousel and the behaviour tabs, not the
@@ -661,6 +841,11 @@ function loop() {
   if (diver.visible) {
     const bob = Math.sin(t * 1.25) * Math.min(0.06, (diver.userData.h || 1) * 0.03);
     diver.position.y = (diver.userData.baseY || 0) + bob;
+  }
+  if (standIn.visible) {
+    standIn.rotation.y = t * 0.55;
+    standIn.position.y = Math.sin(t * 1.5) * 0.1;
+    standIn.scale.setScalar(0.94 + Math.sin(t * 2.1) * 0.05);
   }
   // per-behaviour camera hint — paused while the diver comparison owns the frame
   const vw = !scaleOn && settled ? cur.view?.() : null;
@@ -718,9 +903,13 @@ function loop() {
   if (scaleOn && scaleFit && cur?.g) cur.g.position.x = -scaleFit.shiftX;
   pm.uniforms.t.value = t;
   const beh = cur && !flights.some(f => f.o === cur) ? cur.active?.() : null;
-  envx.update(t, dt, { beh, cur, lights: LB, fog: scene.fog, renderer: R });
+  envx.update(t, dt, { beh, cur, lights: LB, fog: scene.fog, renderer: R, camDist: Math.max(dist, cam.position.length()) });
   hemi.intensity = LB.hemiBase * LB.hemiMul / 1.3; key.intensity = LB.keyBase * LB.keyMul;
-  if (beh && beh !== lastBeh) { if (lastBeh !== null || actionMode !== 'auto') audio.behavior(cur.s.id, beh); lastBeh = beh; }
+  if (beh && beh !== lastBeh) {
+    if (lastBeh !== null || actionMode !== 'auto') audio.behavior(cur.s.id, beh);
+    lastBeh = beh;
+    if (actionMode === 'auto') syncCaption();
+  }
   if (useScale && scene.fog?.isFogExp2) {
     const thin = Math.min(1, (frameDist || 9) / Math.max(dist, 0.5));
     scene.fog.density *= thin;
@@ -739,14 +928,31 @@ function loop() {
   }
   $('#dot').style.transform = `translate(${Math.sin(rotY) * 10}px,${-Math.cos(rotY) * 10}px)`;
   composer.render();
-  if (cur && fr % 2 === 0) {
-    const p = cur.s.detail.pt; tmp.set(...p);
-    cur.raw.localToWorld(tmp);
-    const dir = tmp.clone().normalize();
-    if (dir.lengthSq() < .01) dir.set(0, 0, 1);
-    dir.z = Math.abs(dir.z) + 0.6; dir.normalize();
-    dcam.position.copy(tmp).addScaledVector(dir, 1.4); dcam.lookAt(tmp);
-    shadow.visible = false; DR.render(scene, dcam); shadow.visible = true;
+  if (cur && fr % 2 === 0 && !cur.s.detail.hide) {
+    const spec = cur.s.detail;
+    let aimed = false;
+    if (spec.bone) {
+      const bone = cur.raw.getObjectByName(spec.bone);
+      if (bone) { bone.getWorldPosition(tmp); aimed = true; }
+    }
+    if (!aimed) { tmp.set(...spec.pt); cur.raw.localToWorld(tmp); }
+    _bv.set(0.35, 0.2, 1).applyQuaternion(stage.quaternion).normalize();
+    dcam.position.copy(tmp).addScaledVector(_bv, spec.cam || 0.9);
+    dcam.lookAt(tmp);
+    const stash = [];
+    const hideFx = o => { if (o.userData?.noDetail && o.visible) { stash.push(o); o.visible = false; } };
+    if (diver.visible) { stash.push(diver); diver.visible = false; }
+    cur.g.traverse(hideFx);
+    shadow.visible = false;
+    if (spec.fill) {
+      detailFill.visible = true;
+      detailFill.intensity = spec.fill;
+      detailFill.position.copy(dcam.position);
+    }
+    DR.render(scene, dcam);
+    detailFill.visible = false;
+    shadow.visible = true;
+    for (const o of stash) o.visible = true;
   }
   requestAnimationFrame(loop);
 }
@@ -760,7 +966,7 @@ if (hp.get('theme') === 'light') { body.classList.add('light'); body.classList.r
 syncMobileChrome();
 applyTheme();
 navBuild();
-select(+(hp.get('s') || 0), true).then(() => {
+select(indexFromSearch(hp), true).then(() => {
   if (hp.get('imm')) { tZoom = -4.4; setImm(true); }
 });
 loop();
