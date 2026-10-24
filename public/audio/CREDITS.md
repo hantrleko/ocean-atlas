@@ -21,5 +21,15 @@ ambience loops given a 1.5 s self-crossfade at the loop point. AAC 48–64 kbps 
 | jet-whoosh | squid jet propulsion whoosh |
 | bubbles | rising bubble stream |
 
+| amb-ice | polar ice edge: fine ice, cold wind, low underwater rumble, no gulls. Loops |
+| sting-whale-squid | one-shot cabinet change, sperm whale ↔ giant squid |
+| sting-turtle-jelly | one-shot cabinet change, leatherback ↔ lion's mane |
+| sting-loan | one-shot, under a second, entering a polar loan |
+| vo-clownfish, vo-great_white, vo-turtle, vo-dolphin, vo-sperm_whale, vo-giant_squid, vo-angler, vo-vampire | Chinese flagship plaques, played once per session when that moment opens |
+| vo-welcome-back | soft Chinese whisper when a visitor who has all four wing stamps returns |
+
+These later files are mp3 only. `src/audio.js` tries AAC first, then falls back to mp3.
+`amb-ice` loops; stings and voice do not.
+
 Other sounds (lure hum, sonar ping, glow chime, jelly pulse, sand thud, grazing crunch) and the
 music pad under each ambience are synthesised live with WebAudio in `src/audio.js`.

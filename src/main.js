@@ -12,7 +12,7 @@ import { behaviorCaption } from './behaviors.js';
 import { frameFor, distToContain } from './framing.js';
 import { createDiver, DIVER_HEIGHT_M } from './diver.js';
 import { sizeOf } from './sizes.js';
-import { ACTS, actOf, actIndex, nextAct, flagshipOf, lineOf, wingMembers, isGuest, pairOf, SEASON } from './journey.js';
+import { ACTS, actOf, actIndex, nextAct, flagshipOf, lineOf, wingMembers, isGuest, pairOf, stingOf, seasonAmbFor, SEASON } from './journey.js';
 import { loadPassport, markVisit, allWingsSeen, markSeason, passportSummary } from './passport.js';
 
 const $ = s => document.querySelector(s), body = document.body;
@@ -269,6 +269,7 @@ function navBuild() {
     goAct(nextAct(actId).id);
   });
   $('#season')?.addEventListener('click', e => {
+    if (e.target.closest('[data-trailer]')) { openTrailer(); return; }
     const b = e.target.closest('button[data-id]');
     if (!b) return;
     const id = b.dataset.id;
@@ -311,7 +312,10 @@ function paintSeason() {
     const guest = isGuest(ACTS.find(a => a.id === stop.act), stop.id);
     return `<button type="button" data-act="${stop.act}" data-id="${stop.id}" class="${on ? 'on' : ''}">${s.name}${guest ? ' · 借' : ''}</button>`;
   }).join('<span class="season-dot" aria-hidden="true">·</span>');
-  el.innerHTML = `<span class="season-k">${SEASON.kicker}</span><b>${SEASON.title}</b><span class="season-stops">${dots}</span>`;
+  const trailer = trailerReady
+    ? `<button type="button" class="season-trailer" data-trailer="1">本季预告</button>`
+    : '';
+  el.innerHTML = `<span class="season-k">${SEASON.kicker}</span><b>${SEASON.title}</b>${trailer}<span class="season-stops">${dots}</span>`;
 }
 
 function paintWing() {
@@ -480,6 +484,7 @@ $('#actions')?.addEventListener('click', e => {
   actionMode = btn.dataset.b;
   paintTabs(actionMode);
   applyActionMode();
+  maybeFlagshipVoice(cur?.s?.id || SPECIES[idx]?.id);
 });
 
 function info(s) {
@@ -564,6 +569,143 @@ function viewingHabitat(speciesId) {
   return null;
 }
 
+function hearingAmb(speciesId) {
+  const seasonal = seasonAmbFor(browse === 'journey' ? actId : '', speciesId);
+  return seasonal || envx.preset().amb;
+}
+
+const PLAQUE_KEY = 'oaPlaque';
+const WHISPER_KEY = 'oaWhisper';
+const plaqueMem = new Set();
+let audioFrom = null;
+let landGreet = false;
+let whisperQueued = false;
+let whisperActive = false;
+let greetGen = 0;
+let chainPlaque = false;
+let voiceSkipped = false;
+let trailerReady = false;
+let soundGateReady = false;
+
+function plaqueHeard(id) {
+  if (plaqueMem.has(id)) return true;
+  try { return JSON.parse(sessionStorage.getItem(PLAQUE_KEY) || '[]').includes(id); }
+  catch { return false; }
+}
+function markPlaque(id) {
+  plaqueMem.add(id);
+  try {
+    const arr = JSON.parse(sessionStorage.getItem(PLAQUE_KEY) || '[]');
+    if (!arr.includes(id)) arr.push(id);
+    sessionStorage.setItem(PLAQUE_KEY, JSON.stringify(arr));
+  } catch { /* 隐私模式 */ }
+}
+function whisperHeard() {
+  try { return sessionStorage.getItem(WHISPER_KEY) === '1'; }
+  catch { return false; }
+}
+function markWhisper() {
+  try { sessionStorage.setItem(WHISPER_KEY, '1'); } catch { /* 隐私模式 */ }
+}
+function showEar(text) {
+  const el = $('#ear');
+  if (!el || !text) return;
+  el.hidden = false;
+  el.textContent = text;
+  clearTimeout(showEar._t);
+  showEar._t = setTimeout(() => { el.hidden = true; }, 3400);
+}
+function trailerSrc() {
+  return import.meta.env.BASE_URL + (SEASON.trailer || 'media/season-trailer.mp4');
+}
+function probeTrailer() {
+  const v = document.createElement('video');
+  v.preload = 'metadata';
+  v.muted = true;
+  v.addEventListener('loadedmetadata', () => { trailerReady = true; paintSeason(); }, { once: true });
+  v.addEventListener('error', () => { trailerReady = false; }, { once: true });
+  v.src = trailerSrc();
+}
+function openTrailer() {
+  const root = $('#trailer');
+  const vid = $('#trailerVid');
+  if (!root || !vid) return;
+  if (!vid.getAttribute('src')) vid.src = trailerSrc();
+  const title = $('#trailerTitle');
+  if (title) title.textContent = SEASON.title ? `${SEASON.title} · 预告` : '本季预告';
+  root.hidden = false;
+  vid.play?.().catch(() => { /* 交给控件 */ });
+}
+function closeTrailer() {
+  const vid = $('#trailerVid');
+  if (vid) { try { vid.pause(); } catch { /* 未开始 */ } }
+  const root = $('#trailer');
+  if (root) root.hidden = true;
+}
+async function maybeWelcome() {
+  if (!allWingsSeen() || whisperHeard()) { landGreet = false; whisperQueued = false; return false; }
+  if (!audio.on) { whisperQueued = true; return false; }
+  const gen = ++greetGen;
+  whisperQueued = false;
+  audio.skipVoice();
+  whisperActive = true;
+  const ok = await audio.voice('vo-welcome-back', 0.38);
+  if (gen !== greetGen) return false;
+  if (!ok) {
+    whisperActive = false;
+    whisperQueued = true;
+    landGreet = true;
+    return false;
+  }
+  markWhisper();
+  landGreet = false;
+  chainPlaque = true;
+  return true;
+}
+function maybeFlagshipVoice(speciesId) {
+  if (!speciesId || landGreet || whisperActive) return;
+  const flag = flagshipOf(speciesId);
+  const open = !!(flag && actionMode === flag.behavior);
+  if (!open) { audio.skipVoice(); return; }
+  if (plaqueHeard(speciesId) || !audio.on) return;
+  void audio.voice(`vo-${speciesId}`, 0.9).then(ok => {
+    if (ok && SPECIES[idx]?.id === speciesId && actionMode === flag.behavior) markPlaque(speciesId);
+  });
+}
+async function armCues(nextId, fromId) {
+  if (whisperActive && fromId && fromId !== nextId) {
+    greetGen += 1;
+    chainPlaque = false;
+    voiceSkipped = true;
+    audio.skipVoice();
+    whisperActive = false;
+    landGreet = false;
+    whisperQueued = false;
+    markWhisper();
+  } else if (fromId && fromId !== nextId) audio.skipVoice();
+  const stingName = stingOf(fromId, nextId);
+  const act = ACTS.find(a => a.id === actId);
+  const loan = !stingName && fromId !== nextId && browse === 'journey' && isGuest(act, nextId) && SEASON.loanSting;
+  if (stingName) {
+    showEar(pairOf(fromId)?.note || '对看。');
+    await audio.sting(stingName);
+  } else if (loan) {
+    showEar('借展。这一件仍住在原来的翼。');
+    await audio.sting(SEASON.loanSting);
+  }
+  if (SPECIES[idx]?.id !== nextId) return;
+  maybeFlagshipVoice(nextId);
+}
+function onSoundGate(on) {
+  if (!soundGateReady) return;
+  if (!on) return;
+  if (whisperQueued || landGreet) {
+    void maybeWelcome();
+    return;
+  }
+  maybeFlagshipVoice(SPECIES[idx]?.id);
+}
+
 async function select(i, instant) {
   const s = SPECIES[i];
   if (!s) return;
@@ -571,7 +713,7 @@ async function select(i, instant) {
     // 同一只，但可能从户籍翼改走到借展（或反过来）。铭牌跟着展区走，模型不重载。
     envx.set(s.id, false, viewingHabitat(s.id));
     body.classList.toggle('env-dark', !!envx.preset().dark);
-    audio.setSpecies(s.id, envx.preset().amb);
+    audio.setSpecies(s.id, hearingAmb(s.id));
     writeDeepLink(s.id);
     info(s);
     paintWing();
@@ -585,8 +727,11 @@ async function select(i, instant) {
   evictStage();
   idx = i;
   focusSpecies(i);
+  const fromId = audioFrom;
+  audioFrom = s.id;
   const moment = flagshipOf(s.id);
   actionMode = moment?.behavior || 'auto';
+  void armCues(s.id, fromId);
   applyFrame(s.id, true, instant);
   scaleFor = s.id;
   diver.visible = false;
@@ -600,7 +745,7 @@ async function select(i, instant) {
   info(s);
   envx.set(s.id, instant, viewingHabitat(s.id));
   body.classList.toggle('env-dark', !!envx.preset().dark);
-  audio.setSpecies(s.id, envx.preset().amb);
+  audio.setSpecies(s.id, hearingAmb(s.id));
   lastBeh = null;
   applyTheme();
   vY = instant ? 0 : 0.05;
@@ -756,6 +901,7 @@ function setImm(v) {
   if (v === imm) return;
   imm = v;
   body.classList.toggle('imm', v);
+  if (v) maybeFlagshipVoice(SPECIES[idx]?.id);
   const hint = $('#hint');
   if (!hint) return;
   clearTimeout(setImm._t);
@@ -771,11 +917,12 @@ $('#bReset').onclick = () => {
 };
 addEventListener('keydown', e => {
   if (e.key === 'Escape') {
+    if ($('#trailer') && !$('#trailer').hidden) { closeTrailer(); return; }
     if ($('#share') && !$('#share').hidden) { closeShare(); return; }
     if ($('#passport') && !$('#passport').hidden) { closePassport(); return; }
     $('#bReset').onclick();
   }
-  const cardOpen = ($('#share') && !$('#share').hidden) || ($('#passport') && !$('#passport').hidden);
+  const cardOpen = ($('#share') && !$('#share').hidden) || ($('#passport') && !$('#passport').hidden) || ($('#trailer') && !$('#trailer').hidden);
   if (e.target.tagName !== 'INPUT' && !cardOpen) {
     if (e.key === 'ArrowRight') stepVisible(1);
     if (e.key === 'ArrowLeft') stepVisible(-1);
@@ -1304,15 +1451,18 @@ function passportRows() {
 }
 function openPassport() {
   const { sum, wings, flags } = passportRows();
+  const back = sum.wings.every(w => w.seen);
   const bodyEl = $('#passBody');
   if (bodyEl) {
-    bodyEl.innerHTML = `<p class="pass-note">${SEASON.copy}</p>`
+    bodyEl.innerHTML = (back ? `<p class="pass-note">欢迎回来。灯还在原来的地方。</p>` : '')
+      + `<p class="pass-note">${SEASON.copy}</p>`
       + `<h3>展区</h3><ul>${wings.map(w => `<li>${w}</li>`).join('')}</ul>`
       + `<h3>旗舰</h3><ul>${flags.map(w => `<li>${w}</li>`).join('')}</ul>`
       + `<p class="pass-note">${sum.seasonSeen ? '本季特展走过了。' : '本季特展还没停过。'}</p>`;
   }
   const root = $('#passport');
   if (root) root.hidden = false;
+  if (back) void maybeWelcome();
 }
 function closePassport() {
   const root = $('#passport');
@@ -1613,6 +1763,23 @@ idx = indexFromSearch(hp);
 actId = actFromSearch(hp, idx);
 browse = 'journey';
 const returnVisit = allWingsSeen();
+landGreet = returnVisit && !whisperHeard();
+audio.onChange(onSoundGate);
+audio.onVoice(playing => {
+  const btn = $('#voSkip');
+  if (btn) btn.hidden = !playing;
+  if (playing) return;
+  whisperActive = false;
+  const chain = chainPlaque && !voiceSkipped;
+  chainPlaque = false;
+  voiceSkipped = false;
+  if (chain) maybeFlagshipVoice(SPECIES[idx]?.id);
+});
+soundGateReady = true;
+probeTrailer();
+$('#voSkip')?.addEventListener('click', () => { voiceSkipped = true; audio.skipVoice(); });
+$('#trailerClose')?.addEventListener('click', closeTrailer);
+$('#trailer')?.addEventListener('click', e => { if (e.target.id === 'trailer') closeTrailer(); });
 navBuild();
 select(idx, true).then(() => {
   if (hp.get('imm')) { tZoom = -4.4; setImm(true); }
@@ -1632,6 +1799,7 @@ select(idx, true).then(() => {
         setTimeout(() => { hello.hidden = true; }, 5600);
       }
     }
+    void maybeWelcome();
   }
 });
 loop();
