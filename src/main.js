@@ -268,6 +268,7 @@ function navBuild() {
     if (browse !== 'journey') { backToJourney(); return; }
     goAct(nextAct(actId).id);
   });
+  $('#trailerHero')?.addEventListener('click', () => openTrailer());
   $('#season')?.addEventListener('click', e => {
     if (e.target.closest('[data-trailer]')) { openTrailer(); return; }
     const b = e.target.closest('button[data-id]');
@@ -316,6 +317,7 @@ function paintSeason() {
     ? `<button type="button" class="season-trailer" data-trailer="1">本季预告</button>`
     : '';
   el.innerHTML = `<span class="season-k">${SEASON.kicker}</span><b>${SEASON.title}</b>${trailer}<span class="season-stops">${dots}</span>`;
+  paintTrailerHero();
 }
 
 function paintWing() {
@@ -618,27 +620,62 @@ function showEar(text) {
 function trailerSrc() {
   return import.meta.env.BASE_URL + (SEASON.trailer || 'media/season-trailer.mp4');
 }
+function posterSrc() {
+  return SEASON.poster ? import.meta.env.BASE_URL + SEASON.poster : '';
+}
+function paintTrailerHero() {
+  const hero = $('#trailerHero');
+  if (!hero) return;
+  hero.hidden = !trailerReady;
+  const kicker = SEASON.kicker || '本季特展';
+  const title = SEASON.title || '本季预告';
+  const k = hero.querySelector('.trailer-k');
+  const b = hero.querySelector('.trailer-t');
+  if (k) k.textContent = kicker;
+  if (b) b.textContent = title;
+  hero.setAttribute('aria-label', `${kicker} ${title}，点按播放预告`);
+  const img = $('#trailerPoster');
+  const poster = posterSrc();
+  if (img && poster && img.getAttribute('src') !== poster) img.src = poster;
+}
+/** 预告跟馆内总开关走：静音时画面可以看，声音不自己响。 */
+function applyTrailerSound() {
+  const vid = $('#trailerVid');
+  if (!vid) return;
+  vid.muted = !audio.on;
+  const v = audio.vol;
+  if (v >= 0 && v <= 1) vid.volume = v;
+}
 function probeTrailer() {
   const v = document.createElement('video');
   v.preload = 'metadata';
   v.muted = true;
   v.addEventListener('loadedmetadata', () => { trailerReady = true; paintSeason(); }, { once: true });
-  v.addEventListener('error', () => { trailerReady = false; }, { once: true });
+  v.addEventListener('error', () => { trailerReady = false; paintTrailerHero(); }, { once: true });
   v.src = trailerSrc();
 }
 function openTrailer() {
   const root = $('#trailer');
   const vid = $('#trailerVid');
-  if (!root || !vid) return;
+  if (!root || !vid || !trailerReady) return;
   if (!vid.getAttribute('src')) vid.src = trailerSrc();
+  const poster = posterSrc();
+  if (poster) vid.poster = poster;
+  vid.loop = false;
+  vid.autoplay = false;
+  applyTrailerSound();
   const title = $('#trailerTitle');
   if (title) title.textContent = SEASON.title ? `${SEASON.title} · 预告` : '本季预告';
   root.hidden = false;
+  try { vid.currentTime = 0; } catch { /* 还没就绪 */ }
   vid.play?.().catch(() => { /* 交给控件 */ });
 }
 function closeTrailer() {
   const vid = $('#trailerVid');
-  if (vid) { try { vid.pause(); } catch { /* 未开始 */ } }
+  if (vid) {
+    try { vid.pause(); } catch { /* 未开始 */ }
+    try { vid.currentTime = 0; } catch { /* 还没就绪 */ }
+  }
   const root = $('#trailer');
   if (root) root.hidden = true;
 }
@@ -1765,6 +1802,7 @@ browse = 'journey';
 const returnVisit = allWingsSeen();
 landGreet = returnVisit && !whisperHeard();
 audio.onChange(onSoundGate);
+audio.onChange(() => applyTrailerSound());
 audio.onVoice(playing => {
   const btn = $('#voSkip');
   if (btn) btn.hidden = !playing;
@@ -1778,6 +1816,7 @@ audio.onVoice(playing => {
 soundGateReady = true;
 probeTrailer();
 $('#voSkip')?.addEventListener('click', () => { voiceSkipped = true; audio.skipVoice(); });
+$('#trailerPoster')?.addEventListener('error', () => { const img = $('#trailerPoster'); if (img) img.hidden = true; });
 $('#trailerClose')?.addEventListener('click', closeTrailer);
 $('#trailer')?.addEventListener('click', e => { if (e.target.id === 'trailer') closeTrailer(); });
 navBuild();

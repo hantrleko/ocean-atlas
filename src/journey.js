@@ -50,8 +50,9 @@ export const ACTS = [
  * 3. amb — 环境音 key，对应 audio.js 的 AMB（冰缘是 ice，文件 public/audio/amb-ice.mp3）。
  *    停在本季某一停靠上时用它，所以换季不用改调用处。栖息地预设里的 amb 只是兜底。
  * 4. loanSting — 走进借展物种时的一声短耳标，文件 public/audio/<loanSting>.mp3。
- * 5. trailer — 可选预告，相对站点根。public/media/season-trailer.mp4 不在时按钮不出现。
- * 海报可另换。新的 GLB 不从这里生成。
+ * 5. trailer — 可选预告，相对站点根。文件不在时，门厅卡片和换季条按钮都不出现。
+ *    poster — 可选静帧。门厅卡片用它，点按才打开对话框，不自动播放、不循环。
+ * 新的 GLB 不从这里生成。
  */
 export const SEASON = {
   id: 'polar-loan-2026',
@@ -61,6 +62,7 @@ export const SEASON = {
   amb: 'ice',
   loanSting: 'sting-loan',
   trailer: 'media/season-trailer.mp4',
+  poster: 'media/season-trailer.jpg',
   stops: [
     { id: 'orca', act: 'polar' },
     { id: 'whale', act: 'polar' },
