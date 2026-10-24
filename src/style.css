@@ -81,12 +81,12 @@ td{padding:8px 0;border-bottom:1px solid var(--line);vertical-align:top}td:first
 .detail b{font-family:var(--serif);font-size:16px;display:block;margin:3px 0}
 .detail p{font-size:11.5px;line-height:1.6;color:var(--mute)}
 #info.swap{animation:sw .6s}@keyframes sw{0%{opacity:1}40%{opacity:0;transform:translateY(8px)}100%{opacity:1}}
-#hint{position:fixed;bottom:26px;left:50%;transform:translate(-50%,20px);opacity:0;font-size:12px;letter-spacing:2px;color:var(--mute);transition:.6s;pointer-events:none}
+#hint{position:fixed;bottom:26px;left:50%;transform:translate(-50%,20px);opacity:0;font-size:12px;letter-spacing:2px;color:var(--mute);transition:transform .45s;pointer-events:none}
 body.imm #left{transform:translateX(-120%);opacity:0}body.imm #right{transform:translateX(120%);opacity:0}
 body.imm .carousel{transform:translateY(-140%);opacity:0}
 body.imm #tools{transform:translate(-200px,-50%);opacity:0}
 body.imm #cap{opacity:0;transform:translateY(30px)}
-body.imm #hint{opacity:1;transform:translate(-50%,0);color:#f7fbff;background:rgba(6,16,28,.78);border:1px solid rgba(255,255,255,.35);padding:8px 16px;border-radius:999px;text-shadow:none;letter-spacing:.4px}
+body.imm #hint{opacity:1;transform:translate(-50%,0);color:#f7fbff;background:rgba(6,16,28,.78);border:1px solid rgba(255,255,255,.35);padding:8px 16px;border-radius:999px;text-shadow:none;letter-spacing:.4px;transition:none}
 
 
 /* Behavior / action chips */
