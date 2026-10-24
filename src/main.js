@@ -12,6 +12,7 @@ import { behaviorCaption } from './behaviors.js';
 import { frameFor, distToContain } from './framing.js';
 import { createDiver, DIVER_HEIGHT_M } from './diver.js';
 import { sizeOf } from './sizes.js';
+import { ACTS, actOf, actIndex, nextAct, flagshipOf, lineOf } from './journey.js';
 
 const $ = s => document.querySelector(s), body = document.body;
 const canvas = $('#c'), R = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
@@ -129,8 +130,13 @@ const THUMB = {
   starfish: '#d4783a', urchin: '#7a3a78',
 };
 
-/** '' = 全部物种；否则为 GROUPS id。点击当前科目会在组内轮换。 */
+/** 浏览方式：journey 策展路径（默认）/ all 全部 / group 科目索引。 */
+let browse = 'journey';
+let actId = ACTS[0].id;
+/** '' = 全部物种；否则为 GROUPS id。只在 browse === 'group' 时过滤轮播。 */
 let groupFilter = '';
+/** 切换物种时把机位缓缓走到下一件展柜，而不是瞬移。 */
+let easeY = null, easeX = null, easeT = 0;
 
 function groupById(id) { return GROUPS.find(g => g.id === id); }
 
@@ -140,65 +146,184 @@ function indicesOf(gid) {
   return out;
 }
 
+function visibleIndices() {
+  if (browse === 'all') return SPECIES.map((_, i) => i);
+  if (browse === 'group') return indicesOf(groupFilter);
+  const act = ACTS.find(a => a.id === actId) || ACTS[0];
+  return act.ids.map(id => SPECIES.findIndex(s => s.id === id)).filter(i => i >= 0);
+}
+
 function renderCarousel() {
-  $('#carousel').innerHTML = indicesOf(groupFilter).map(i => {
+  const journey = browse === 'journey';
+  $('#carousel').innerHTML = visibleIndices().map(i => {
     const s = SPECIES[i];
-    return `<div class="card" data-i="${i}"><span class="thumb" style="--t:${THUMB[s.id] || '#8899aa'}"></span><b>${s.name}</b><i>${s.latin}</i></div>`;
+    const flag = journey && flagshipOf(s.id) ? ' flag' : '';
+    return `<div class="card${flag}" data-i="${i}"><span class="thumb" style="--t:${THUMB[s.id] || '#8899aa'}"></span><b>${s.name}</b><i>${s.latin}</i></div>`;
   }).join('');
 }
 
 function markNav() {
-  document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('on', (a.dataset.g || '') === groupFilter));
+  document.querySelectorAll('#acts button').forEach(b => b.classList.toggle('on', browse === 'journey' && b.dataset.act === actId));
+  document.querySelectorAll('#nav a').forEach(a => {
+    const g = a.dataset.g || '';
+    const on = browse === 'all' ? g === '' : browse === 'group' && g === groupFilter;
+    a.classList.toggle('on', on);
+  });
   document.querySelectorAll('#carousel .card').forEach(c => c.classList.toggle('on', +c.dataset.i === idx));
   document.querySelector('#carousel .card.on')?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
 }
 
-/** 搜索或精选跳到别的科目时，把轮播切到该物种所在的组，避免卡片不在列表里。 */
-function ensureGroup(i) {
-  const g = SPECIES[i].group;
-  if (groupFilter && g !== groupFilter) {
-    groupFilter = g;
+/** 搜索跳到当前列表之外时，留在同一种浏览方式里，只把过滤切到那一件所在的展区或科目。 */
+function focusSpecies(i) {
+  const s = SPECIES[i];
+  if (browse === 'journey') {
+    const act = actOf(s.id);
+    if (act.id !== actId) { actId = act.id; renderCarousel(); }
+  } else if (browse === 'group' && s.group !== groupFilter) {
+    groupFilter = s.group;
     renderCarousel();
   }
 }
 
+function stepVisible(d) {
+  const idxs = visibleIndices();
+  if (!idxs.length) return;
+  const pos = Math.max(0, idxs.indexOf(idx));
+  select(idxs[(pos + d + idxs.length) % idxs.length]);
+}
+
+function goAct(id) {
+  browse = 'journey';
+  actId = id;
+  const leadId = (ACTS.find(a => a.id === id) || ACTS[0]).lead;
+  const lead = Math.max(0, SPECIES.findIndex(s => s.id === leadId));
+  renderCarousel();
+  if (lead !== idx) select(lead);
+  else { markNav(); paintWing(); updateFeat(); }
+}
+
+function backToJourney() {
+  browse = 'journey';
+  actId = actOf(SPECIES[idx]?.id).id;
+  renderCarousel();
+  markNav();
+  paintWing();
+  updateFeat();
+}
+
 function navBuild() {
-  // Land on 全部 (all species). The old default was the first species' group,
-  // which hid everything except the five cephalopods.
-  groupFilter = '';
   const counts = {};
   SPECIES.forEach(s => { counts[s.group] = (counts[s.group] || 0) + 1; });
+  $('#acts').innerHTML = ACTS.map((a, n) =>
+    `<button type="button" data-act="${a.id}"><b>${a.title}</b><i>${String(n + 1).padStart(2, '0')}</i></button>`
+  ).join('');
   $('#nav').innerHTML =
     `<a data-g="" title="全部物种"><b>全部</b><i>${SPECIES.length}</i></a>` +
     GROUPS.map(g => `<a data-g="${g.id}" title="${g.latin} · ${g.note}"><b>${g.zh}</b><i>${counts[g.id] || 0}</i></a>`).join('');
+  $('#acts').onclick = e => {
+    const b = e.target.closest('button'); if (!b) return;
+    const id = b.dataset.act;
+    if (browse === 'journey' && id === actId) { stepVisible(1); return; }
+    goAct(id);
+  };
   $('#nav').onclick = e => {
     const a = e.target.closest('a'); if (!a) return;
     const g = a.dataset.g || '';
-    if (g === groupFilter) {
-      if (!g) return;
-      const idxs = indicesOf(g);
-      const pos = Math.max(0, idxs.indexOf(idx));
-      select(idxs[(pos + 1) % idxs.length]);
+    if (!g) {
+      if (browse === 'all') return;
+      browse = 'all';
+      groupFilter = '';
+      renderCarousel();
+      markNav();
+      paintWing();
+      updateFeat();
       return;
     }
+    if (browse === 'group' && g === groupFilter) { stepVisible(1); return; }
+    browse = 'group';
     groupFilter = g;
     renderCarousel();
-    const idxs = indicesOf(g);
-    if (g && idxs.length && !idxs.includes(idx)) select(idxs[0]);
-    else markNav();
+    const idxs = visibleIndices();
+    if (idxs.length && !idxs.includes(idx)) select(idxs[0]);
+    else { markNav(); paintWing(); updateFeat(); }
   };
   $('#carousel').onclick = e => { const c = e.target.closest('.card'); c && select(+c.dataset.i); };
+  $('#wingCont')?.addEventListener('click', () => {
+    if (browse !== 'journey') { backToJourney(); return; }
+    const idxs = visibleIndices();
+    const pos = idxs.indexOf(idx);
+    if (pos >= 0 && pos < idxs.length - 1) select(idxs[pos + 1]);
+    else goAct(nextAct(actId).id);
+  });
+  $('#wingNext')?.addEventListener('click', () => {
+    if (browse !== 'journey') { backToJourney(); return; }
+    goAct(nextAct(actId).id);
+  });
   renderCarousel();
-  updateFeat(0);
+  paintWing();
+  updateFeat();
 }
 
-function updateFeat(i) {
-  const f = SPECIES[i];
-  if (!f) return;
-  $('#featName').textContent = f.name;
-  $('#featLatin').textContent = f.latin;
-  $('#featCap').textContent = f.caption;
-  $('#featGo').onclick = () => select(i);
+function paintWing() {
+  const kicker = $('#wingKicker'), title = $('#wingTitle'), copy = $('#wingCopy');
+  const cont = $('#wingCont'), next = $('#wingNext');
+  if (!kicker || !title || !copy) return;
+  if (browse === 'journey') {
+    const act = ACTS.find(a => a.id === actId) || ACTS[0];
+    const n = actIndex(act.id);
+    const nxt = nextAct(act.id);
+    const idxs = visibleIndices();
+    const atEnd = idxs.length > 0 && idxs[idxs.length - 1] === idx;
+    kicker.textContent = `${act.kicker} · ${String(n + 1).padStart(2, '0')} / ${String(ACTS.length).padStart(2, '0')}`;
+    title.textContent = act.title;
+    copy.textContent = act.copy;
+    if (cont) {
+      cont.hidden = false;
+      cont.textContent = atEnd ? `前往${nxt.title}` : '继续';
+      cont.title = atEnd ? `进入${nxt.title}` : '本展区下一件';
+    }
+    if (next) {
+      next.hidden = false;
+      next.textContent = n === ACTS.length - 1 ? `回到${nxt.title}` : '下一展区';
+    }
+    return;
+  }
+  if (cont) cont.hidden = true;
+  if (next) { next.hidden = false; next.textContent = '回到策展'; }
+  if (browse === 'group') {
+    const g = groupById(groupFilter);
+    kicker.textContent = '科目索引';
+    title.textContent = g ? g.zh : '科目';
+    copy.textContent = g ? `${g.note}。这一组按分类排在一起，策展路径仍可随时回去。` : '';
+    return;
+  }
+  kicker.textContent = '全部馆藏';
+  title.textContent = '三十三件';
+  copy.textContent = '全部物种按你自己的顺序摊开。想跟着灯走，就回到策展路径。';
+}
+
+function updateFeat() {
+  const act = browse === 'journey'
+    ? (ACTS.find(a => a.id === actId) || ACTS[0])
+    : actOf(SPECIES[idx]?.id);
+  const lead = SPECIES.find(s => s.id === act.lead) || SPECIES[0];
+  const onLead = browse === 'journey' && SPECIES[idx]?.id === lead.id;
+  const portal = onLead ? 'next' : (browse === 'journey' ? 'lead' : 'enter');
+  $('#featKicker').textContent = browse === 'journey' ? '本展区专题 · FEATURED' : '策展入口 · FEATURED';
+  $('#featName').textContent = act.title;
+  $('#featLatin').textContent = `${lead.name} · ${lead.latin}`;
+  $('#featCap').textContent = act.copy;
+  const nxt = nextAct(act.id);
+  $('#featGo').textContent = portal === 'next'
+    ? (actIndex(act.id) === ACTS.length - 1 ? `回到${nxt.title}` : '下一展区 →')
+    : (browse === 'journey' ? '进入专题 →' : '进入该展区 →');
+  $('#featGo').onclick = () => {
+    if (portal === 'next') goAct(nxt.id);
+    else if (portal === 'lead') {
+      const i = SPECIES.findIndex(s => s.id === lead.id);
+      if (i >= 0) select(i);
+    } else goAct(act.id);
+  };
 }
 
 function indexFromSearch(hp) {
@@ -212,7 +337,15 @@ function indexFromSearch(hp) {
     const n = +s;
     if (Number.isFinite(n)) return Math.min(SPECIES.length - 1, Math.max(0, n));
   }
-  return 0;
+  const lead = SPECIES.findIndex(s => s.id === ACTS[0].lead);
+  return lead >= 0 ? lead : 0;
+}
+
+function syncTitle(s) {
+  const line = lineOf(s);
+  document.title = `${s.name} · ${line} · 深海图鉴`;
+  const md = document.querySelector('meta[name="description"]');
+  if (md) md.setAttribute('content', `${s.name}（${s.latin}）：${line}`);
 }
 
 function writeDeepLink(id) {
@@ -283,6 +416,9 @@ function info(s) {
     $('#desc').textContent = s.desc;
     $('#traits').innerHTML = Object.entries(s.traits).map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
     $('#dTitle').textContent = s.detail.title; $('#dText').textContent = s.detail.text;
+    const pull = $('#pull'); if (pull) pull.textContent = lineOf(s);
+    const spName = $('#spName'); if (spName) spName.textContent = s.name;
+    syncTitle(s);
     const card = document.querySelector('#info .detail');
     if (card) card.hidden = !!s.detail.hide;
     syncCaption(s);
@@ -294,16 +430,20 @@ async function select(i, instant) {
   if (cur && i === idx && !instant) return;
   idx = i;
   const s = SPECIES[i];
-  ensureGroup(i);
+  focusSpecies(i);
   const token = ++loadToken;
-  actionMode = 'auto';
-  applyFrame(s.id, true);
+  const moment = flagshipOf(s.id);
+  actionMode = moment?.behavior || 'auto';
+  applyFrame(s.id, true, instant);
   scaleFor = s.id;
+  if (cur?.g) cur.g.position.x = 0;
   diver.visible = false;
   scaleFit = null;
   refreshScaleHint(s);
-  updateFeat(i);
+  updateFeat();
+  paintWing();
   writeDeepLink(s.id);
+  considerScaleNudge(s);
   rebuildActions(s.id);
   info(s);
   envx.set(s.id, instant);
@@ -365,12 +505,13 @@ const ease = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
 function flightsStep(dt) {
   for (let k = flights.length - 1; k >= 0; k--) {
     const f = flights[k];
-    f.t = Math.min(1, f.t + dt / 0.9);
+    f.t = Math.min(1, f.t + dt / 1.15);
     const e = ease(f.t), g = f.o.g;
     if (f.out) {
-      g.scale.setScalar(Math.max(0.001, 1 - e));
-      g.position.set(-e * 5, e * 1.5, -e * 3);
-      g.rotation.y = e * 2;
+      // Hold the previous case in the room and ease it back into the fog.
+      g.scale.setScalar(Math.max(0.001, 1 - e * 0.22));
+      g.position.set(-e * 1.35, e * 0.2, -e * 2.6);
+      g.rotation.y = e * 0.35;
       if (f.t >= 1) {
         stage.remove(g);
         disposeCloneMaterials(g);
@@ -379,10 +520,10 @@ function flightsStep(dt) {
         flights.splice(k, 1);
       }
     } else {
-      const d = Math.max(0, (f.t - 0.25) / 0.75), e2 = ease(d);
-      g.scale.setScalar(Math.max(0.001, e2));
-      g.position.set((1 - e2) * 5, (1 - e2) * -1.2, (1 - e2) * -3);
-      g.rotation.y = (1 - e2) * -2;
+      const d = Math.max(0, (f.t - 0.12) / 0.88), e2 = ease(d);
+      g.scale.setScalar(Math.max(0.001, 0.86 + 0.14 * e2));
+      g.position.set((1 - e2) * 1.5, (1 - e2) * -0.28, (1 - e2) * -2.4);
+      g.rotation.y = (1 - e2) * -0.35;
       if (f.t >= 1) flights.splice(k, 1);
     }
   }
@@ -447,17 +588,31 @@ addEventListener('wheel', e => {
   e.preventDefault(); zoomBy(e.deltaY * 0.004);
 }, { passive: false });
 function zoomBy(d) { tZoom = Math.max(-4.8, Math.min(8, tZoom + d)); setImm(tZoom < -2.2); }
-function setImm(v) { if (v === imm) return; imm = v; body.classList.toggle('imm', v); }
+function setImm(v) {
+  if (v === imm) return;
+  imm = v;
+  body.classList.toggle('imm', v);
+  const hint = $('#hint');
+  if (!hint) return;
+  clearTimeout(setImm._t);
+  if (v) {
+    hint.classList.add('show');
+    setImm._t = setTimeout(() => hint.classList.remove('show'), 2600);
+  } else hint.classList.remove('show');
+}
 $('#bZoom').onclick = () => { tZoom = imm ? 0 : -3.4; setImm(!imm); };
 $('#bReset').onclick = () => {
   const f = frameFor(cur?.s?.id);
   rotY = f.yaw; rotX = f.pitch; vY = 0; tZoom = 0; setImm(false);
 };
 addEventListener('keydown', e => {
-  if (e.key === 'Escape') $('#bReset').onclick();
-  if (e.target.tagName !== 'INPUT') {
-    if (e.key === 'ArrowRight') select((idx + 1) % SPECIES.length);
-    if (e.key === 'ArrowLeft') select((idx + SPECIES.length - 1) % SPECIES.length);
+  if (e.key === 'Escape') {
+    if ($('#share') && !$('#share').hidden) { closeShare(); return; }
+    $('#bReset').onclick();
+  }
+  if (e.target.tagName !== 'INPUT' && ($('#share')?.hidden !== false)) {
+    if (e.key === 'ArrowRight') stepVisible(1);
+    if (e.key === 'ArrowLeft') stepVisible(-1);
   }
 });
 
@@ -580,18 +735,24 @@ $('#featGo')?.addEventListener('click', () => { if (isMobile()) closeNav(); });
 
 let holdView = 0, viewDist = 0, lookY = 0, aimY = 0, camY = 0, frameY = 0;
 
-function applyFrame(id, resetOrbit) {
+function applyFrame(id, resetOrbit, snap) {
   const f = frameFor(id);
   frameDist = f.dist;
   frameFov = f.fov;
   frameAimY = f.aimY || 0;
   frameAimX = f.aimX || 0;
   if (resetOrbit) {
-    rotY = f.yaw;
-    rotX = f.pitch;
     vY = 0;
-    tZoom = 0;
-    setImm(false);
+    if (snap) {
+      rotY = f.yaw;
+      rotX = f.pitch;
+      easeT = 0;
+    } else {
+      easeY = f.yaw;
+      easeX = f.pitch;
+      easeT = 0.95;
+    }
+    if (!imm) tZoom = 0;
   }
 }
 
@@ -707,7 +868,7 @@ function refineSquidFrame(obj) {
 
 function prefetchNeighbors(i, token) {
   if (isMobile()) return;
-  const list = indicesOf(groupFilter);
+  const list = visibleIndices();
   const pos = list.indexOf(i);
   if (pos < 0) return;
   const ids = [1, -1, 2].map(d => list[pos + d]).filter(j => j != null).map(j => SPECIES[j].id);
@@ -743,21 +904,95 @@ async function copyText(text) {
     return ok;
   }
 }
-async function shareSpecies() {
-  const s = cur?.s || SPECIES[idx];
-  if (!s) return;
+function sharePayload(s) {
   const url = new URL(location.href);
   url.searchParams.set('id', s.id);
   url.searchParams.delete('s');
-  const data = { title: `${s.name} · 深海图鉴`, text: s.caption, url: url.toString() };
-  if (navigator.share) {
-    try { await navigator.share(data); return; }
-    catch (err) { if (err?.name === 'AbortError') return; }
-  }
-  const ok = await copyText(data.url);
-  sayHint(ok ? '链接已复制' : '无法复制链接');
+  const line = lineOf(s);
+  const card = `${s.name}\n${line}\n${s.latin}\n${url.toString()}`;
+  return {
+    s, line, url: url.toString(), card,
+    data: { title: `${s.name} · 深海图鉴`, text: `${s.name}\n${line}`, url: url.toString() },
+  };
 }
+function openShare() {
+  const s = cur?.s || SPECIES[idx];
+  if (!s) return;
+  const p = sharePayload(s);
+  $('#shareTitle').textContent = s.name;
+  $('#shareLatin').textContent = `${s.latin} · ${s.en}`;
+  $('#shareLine').textContent = p.line;
+  $('#shareUrl').textContent = p.url;
+  const root = $('#share');
+  root.hidden = false;
+  root.dataset.card = p.card;
+  $('#shareSys').hidden = !navigator.share;
+}
+function closeShare() {
+  const root = $('#share');
+  if (root) root.hidden = true;
+}
+async function shareSpecies() { openShare(); }
 $('#bShare')?.addEventListener('click', () => { shareSpecies(); });
+$('#shareClose')?.addEventListener('click', closeShare);
+$('#share')?.addEventListener('click', e => { if (e.target.id === 'share') closeShare(); });
+$('#shareCopy')?.addEventListener('click', async () => {
+  const ok = await copyText($('#share')?.dataset.card || '');
+  sayHint(ok ? '卡片已复制' : '无法复制');
+});
+$('#shareSys')?.addEventListener('click', async () => {
+  const s = cur?.s || SPECIES[idx];
+  if (!s || !navigator.share) return;
+  const { data } = sharePayload(s);
+  try { await navigator.share(data); closeShare(); }
+  catch (err) { if (err?.name !== 'AbortError') sayHint('无法打开系统分享'); }
+});
+$('#shareImg')?.addEventListener('click', () => {
+  const s = cur?.s || SPECIES[idx];
+  if (!s) return;
+  const p = sharePayload(s);
+  const c = document.createElement('canvas');
+  c.width = 1200; c.height = 630;
+  const g = c.getContext('2d');
+  const grd = g.createLinearGradient(0, 0, 1200, 630);
+  grd.addColorStop(0, '#071422');
+  grd.addColorStop(0.55, '#0c3048');
+  grd.addColorStop(1, '#14324a');
+  g.fillStyle = grd;
+  g.fillRect(0, 0, 1200, 630);
+  const font = '"WenQuanYi Micro Hei","Noto Sans SC","PingFang SC",sans-serif';
+  g.fillStyle = '#7ec8d4';
+  g.font = `500 22px ${font}`;
+  g.fillText('深海图鉴  ·  OCEAN ATLAS', 72, 86);
+  const act = actOf(s.id);
+  g.fillStyle = '#b7d4de';
+  g.font = `20px ${font}`;
+  if (act) g.fillText(act.title, 72, 128);
+  g.fillStyle = '#f4fbff';
+  g.font = `600 64px ${font}`;
+  g.fillText(s.name, 72, 230);
+  g.fillStyle = '#9fb6c2';
+  g.font = `italic 28px ${font}`;
+  g.fillText(s.latin, 72, 280);
+  g.fillStyle = '#f7fbff';
+  g.font = `italic 36px ${font}`;
+  const max = 1040;
+  const lines = [];
+  let curLine = '';
+  for (const ch of p.line) {
+    if (g.measureText(curLine + ch).width > max) { lines.push(curLine); curLine = ch; }
+    else curLine += ch;
+  }
+  if (curLine) lines.push(curLine);
+  lines.slice(0, 3).forEach((ln, n) => g.fillText(ln, 72, 380 + n * 52));
+  g.fillStyle = '#6f8e9c';
+  g.font = `22px ${font}`;
+  g.fillText(p.url.replace(/^https?:\/\//, ''), 72, 560);
+  const a = document.createElement('a');
+  a.href = c.toDataURL('image/png');
+  a.download = `ocean-atlas-${s.id}.png`;
+  a.click();
+});
 
 function formatMeters(m) {
   if (m >= 1) return `${Number(m.toFixed(m >= 10 ? 0 : 1))} 米`;
@@ -778,14 +1013,64 @@ function refreshScaleHint(species = cur?.s) {
     : '';
   hint.classList.toggle('on', !!(scaleOn && spec));
 }
+const SCALE_NUDGE_KEY = 'oaScaleNudge';
+function nudgeSeen() {
+  try { return sessionStorage.getItem(SCALE_NUDGE_KEY) === '1'; } catch { return true; }
+}
+function markNudge() {
+  try { sessionStorage.setItem(SCALE_NUDGE_KEY, '1'); } catch { /* private mode */ }
+}
+function hideScaleOffer() {
+  const offer = document.getElementById('scaleOffer');
+  if (offer) offer.hidden = true;
+}
+function considerScaleNudge(species) {
+  clearTimeout(considerScaleNudge._t);
+  const offer = document.getElementById('scaleOffer');
+  if (!offer || nudgeSeen() || scaleOn) { hideScaleOffer(); return; }
+  const flag = flagshipOf(species.id);
+  if (!flag || (flag.scale !== 'tiny' && flag.scale !== 'large')) { hideScaleOffer(); return; }
+  const spec = sizeOf(species.id);
+  considerScaleNudge._t = setTimeout(() => {
+    if (scaleOn || cur?.s?.id !== species.id || nudgeSeen()) return;
+    const text = document.getElementById('scaleOfferText');
+    if (text) {
+      text.textContent = flag.scale === 'tiny'
+        ? `${species.name}大约只有 ${formatMeters(spec.lengthMeters)}。要不要请潜水员站到旁边？`
+        : `${species.name}大约有 ${formatMeters(spec.lengthMeters)}。要不要请潜水员站到旁边？`;
+    }
+    offer.hidden = false;
+    markNudge();
+  }, 2800);
+}
+function enableScale() {
+  if (scaleOn) return;
+  scaleOn = true;
+  tZoom = 0;
+  easeT = 0;
+  if (cur && cur.s.id === scaleFor && !flights.some(f => f.o === cur)) layoutScale();
+  refreshScaleHint();
+}
 { // 比例对比：1.75 m 潜水员与当前物种并排
   const btn = document.getElementById('bScale');
   btn?.addEventListener('click', () => {
     scaleOn = !scaleOn;
     tZoom = 0;
+    easeT = 0;
+    hideScaleOffer();
+    markNudge();
     if (!scaleOn) clearScaleShift();
     else if (cur && cur.s.id === scaleFor && !flights.some(f => f.o === cur)) layoutScale();
     refreshScaleHint();
+  });
+  document.getElementById('scaleOfferGo')?.addEventListener('click', () => {
+    hideScaleOffer();
+    markNudge();
+    enableScale();
+  });
+  document.getElementById('scaleOfferNo')?.addEventListener('click', () => {
+    hideScaleOffer();
+    markNudge();
   });
 }
 /**
@@ -855,12 +1140,20 @@ function loop() {
     vY *= 0.94;
     if (scaleOn && scaleFit) {
       vY = 0;
+      easeT = 0;
       rotY += (0.42 - rotY) * 0.22;
       rotX += (0.06 - rotX) * 0.22;
+    } else if (easeT > 0 && easeY != null) {
+      easeT = Math.max(0, easeT - dt);
+      const k = 1 - Math.exp(-dt * 3.1);
+      rotY += (easeY - rotY) * k;
+      rotX += (easeX - rotX) * k;
+      vY = 0;
     } else rotY += vY + (steer && vw.yaw != null ? 0 : dt * 0.08);
   }
-  if (steer && vw.yaw != null) { const tgt = vw.yaw + Math.PI * 2 * Math.round((rotY - vw.yaw) / (Math.PI * 2)); rotY += (tgt - rotY) * (1 - Math.exp(-dt * (vw.yawK || 2.4))); }  // frame-rate independent
-  if (steer && vw.pitch != null) rotX += (vw.pitch - rotX) * 0.04;
+  const easing = easeT > 0 && !scaleOn;
+  if (!easing && steer && vw.yaw != null) { const tgt = vw.yaw + Math.PI * 2 * Math.round((rotY - vw.yaw) / (Math.PI * 2)); rotY += (tgt - rotY) * (1 - Math.exp(-dt * (vw.yawK || 2.4))); }  // frame-rate independent
+  if (!easing && steer && vw.pitch != null) rotX += (vw.pitch - rotX) * 0.04;
   if (window.__oa) { window.__oa.rotY = rotY; window.__oa.steer = !!(steer && vw.yaw != null); if (window.__oa.setYaw != null) { rotY = window.__oa.setYaw; vY = 0; } }
   const mob = innerWidth < 900; // mobile: stage is the upper part of the screen, so pull back more and aim lower
   viewDist += (((vw && (mob && vw.mobDist != null ? vw.mobDist : vw.dist)) || 0) * (mob && vw?.dist > 0 ? 1.6 : 1) - viewDist) * 0.05; const wantY = vw && vw.track && cur.trackY ? cur.trackY() * 0.9 + (mob ? -1.0 : 0) : ((vw && vw.lookY) || 0) * (mob ? -0.6 : 1);
@@ -905,6 +1198,7 @@ function loop() {
   const beh = cur && !flights.some(f => f.o === cur) ? cur.active?.() : null;
   envx.update(t, dt, { beh, cur, lights: LB, fog: scene.fog, renderer: R, camDist: Math.max(dist, cam.position.length()) });
   hemi.intensity = LB.hemiBase * LB.hemiMul / 1.3; key.intensity = LB.keyBase * LB.keyMul;
+  if (audio.on && fr % 8 === 0) audio.setSpace?.(cam.position.length(), imm);
   if (beh && beh !== lastBeh) {
     if (lastBeh !== null || actionMode !== 'auto') audio.behavior(cur.s.id, beh);
     lastBeh = beh;
@@ -965,8 +1259,11 @@ if (hp.get('theme') === 'dark') { body.classList.add('dark'); body.classList.rem
 if (hp.get('theme') === 'light') { body.classList.add('light'); body.classList.remove('dark'); }
 syncMobileChrome();
 applyTheme();
+idx = indexFromSearch(hp);
+actId = actOf(SPECIES[idx].id).id;
+browse = 'journey';
 navBuild();
-select(indexFromSearch(hp), true).then(() => {
+select(idx, true).then(() => {
   if (hp.get('imm')) { tZoom = -4.4; setImm(true); }
 });
 loop();

@@ -203,6 +203,80 @@ const SPECIES_ENV = {
 for (const [id, name] of Object.entries(SPECIES_ENV)) PRESETS[id] = ENV[name];
 
 /**
+ * Flagship ecological moments. While that behaviour is showing, the room leans
+ * harder into the habitat (warmer anemone, a last shaft over a sleeping whale,
+ * a quieter lamp-room). Other behaviours fall back to the species preset.
+ * `hemi` / `key` match the preset tuple shape: [sky, ground, intensity] / [color, intensity].
+ */
+const MOMENT = {
+  clownfish: {
+    beh: 'nestle',
+    patch: {
+      fog: 0.044, sun: 1, caus: 1.45, rays: 0.95, grass: 1.2, snowOp: 0.12,
+      specks: 0.42, speckCol: 0xffb0a0, top: 0x7ad8d0, hor: 0x3498a4, bot: 0x1a5c70,
+      exposure: 1.08,
+      hemi: [0xfff1ea, 0x8a5848, 1.4], key: [0xffc8aa, 2.35],
+    },
+  },
+  great_white: {
+    beh: 'breach',
+    patch: {
+      fog: 0.02, sun: 1.2, rays: 1.35, surf: 1, snowOp: 0.18,
+      top: 0xb7ecff, hor: 0x1f78b0, bot: 0x0a4068, exposure: 1.12,
+      hemi: [0xf4fbff, 0x1a4868, 1.48], key: [0xfff8ea, 2.55],
+    },
+  },
+  turtle: {
+    beh: 'graze',
+    patch: {
+      fog: 0.04, caus: 1.5, grass: 1.25, sun: 1.05, rays: 1, bedY: -1.8,
+      grassCol: 0x3a8a30, exposure: 1.08,
+      hemi: [0xeefee8, 0x4a6a38, 1.4], key: [0xfff3c8, 2.35],
+    },
+  },
+  dolphin: {
+    beh: 'leap',
+    patch: {
+      fog: 0.02, sun: 1.15, rays: 1.25, surf: 1, specks: 0.22, speckCol: 0xe8f8ff,
+      top: 0x8ad6f4, exposure: 1.1,
+      hemi: [0xf2fbff, 0x1a4a68, 1.42], key: [0xfff6e2, 2.4],
+    },
+  },
+  sperm_whale: {
+    beh: 'sleep',
+    patch: {
+      fog: 0.064, sun: 0.05, rays: 0.28, surf: 0.08, snowOp: 0.9, specks: 0.55, speckCol: 0x3a88b0,
+      top: 0x061018, hor: 0x07141e, bot: 0x02060c, exposure: 0.84,
+      hemi: [0x3a5878, 0x040810, 0.62], key: [0x8aa4c0, 0.72],
+    },
+  },
+  giant_squid: {
+    beh: 'duel',
+    patch: {
+      fog: 0.052, sun: 0.06, rays: 0.16, specks: 1.2, speckCol: 0x9a6cff, snowOp: 0.72,
+      top: 0x140e28, hor: 0x0c1430, bot: 0x070814, exposure: 0.9,
+      hemi: [0x685888, 0x0a0c18, 0.72], key: [0xb0a0d8, 0.95],
+    },
+  },
+  angler: {
+    beh: 'ambush',
+    patch: {
+      fog: 0.068, sun: 0, rays: 0, specks: 0.55, speckCol: 0x6dffe2, snowOp: 0.5,
+      top: 0x03060c, hor: 0x050910, bot: 0x020305, exposure: 0.8,
+      hemi: [0x1a2838, 0x020408, 0.42], key: [0x1a3048, 0.55],
+    },
+  },
+  vampire: {
+    beh: 'snow',
+    patch: {
+      fog: 0.05, sun: 0.03, rays: 0.04, specks: 0.25, speckCol: 0xc5d8ff, snowOp: 1.15,
+      top: 0x101828, hor: 0x141e2e, bot: 0x0a1018, exposure: 0.9,
+      hemi: [0x5a7090, 0x10141c, 0.7], key: [0xb7c6da, 0.85],
+    },
+  },
+};
+
+/**
  * Habitat bucket for each species. Visual preset `amb` follows the bucket:
  * deep / benthic_deep → abyss, twilight → twilight, reef / benthic → reef,
  * open → open, surface → surface, coastal → midwater or the coastal reef bed.
@@ -416,9 +490,11 @@ void main(){vec3 v=normalize(cameraPosition-vW);float fr=pow(1.-abs(v.y),3.);
   /** Per-frame: blend, push uniforms, react to behaviour. Returns light tint info for main.js. */
   function update(t, dt, { beh, cur, lights, fog, renderer, camDist = 12 }) {
     T.value = t;
+    const moment = MOMENT[sid];
+    const look = moment && beh === moment.beh ? { ...target, ...moment.patch } : target;
     const k = 1 - Math.exp(-dt * 2.2);
-    for (const n of NUM) st[n] += ((target[n] ?? 0) - st[n]) * k;
-    for (const n of COL) st[n].lerp(tmpC.set(target[n] ?? 0), k);
+    for (const n of NUM) st[n] += ((look[n] ?? 0) - st[n]) * k;
+    for (const n of COL) st[n].lerp(tmpC.set(look[n] ?? 0), k);
     const lum = dark ? 0.62 : 1;
     // Keep the backdrop sphere around the camera. Tiny species in scale mode
     // pull the camera outside the old radius and the page background shows as a hard circle.
@@ -447,7 +523,7 @@ void main(){vec3 v=normalize(cameraPosition-vW);float fr=pow(1.-abs(v.y),3.);
     const wOp = Math.max(st.water, st.ceil); water.visible = wOp > .02; wU.op.value = wOp;
     wU.below.value = target.ceil ? 1 : 0; water.position.y = target.ceil ? ceilY + (1 - st.ceil) * 3 : (target.waterY ?? -.15) - (1 - st.water) * 2;
     // lights: tint toward preset
-    const [hs, hg, hi] = target.hemi, [kc, ki] = target.key;
+    const [hs, hg, hi] = look.hemi, [kc, ki] = look.key;
     lights.hemi.color.lerp(tmpC.set(hs), k); lights.hemi.groundColor.lerp(tmpC.set(hg), k);
     lights.hemiMul += (hi - lights.hemiMul) * k; lights.keyMul += (ki / 2 - lights.keyMul) * k; lights.key.color.lerp(tmpC.set(kc), k);
     // caustic flicker on the key light in sunlit scenes

@@ -1,14 +1,14 @@
 <!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>深海图鉴 · Ocean Atlas</title>
-<meta name="description" content="深海图鉴：按科目分类的 3D 海洋生物图鉴，33 种可 360° 旋转的物种，每种都有专属行为与栖息环境。">
+<meta name="description" content="深海图鉴：一座可以走进去的海洋博物馆。从浅海礁盘、大洋上层，到暮光与深渊、极地冰缘，三十三种 3D 海洋生物沿着策展路径陈列。">
 <meta name="theme-color" content="#0d2340">
 <link rel="icon" type="image/svg+xml" href="./favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32.png">
 <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="深海图鉴 · Ocean Atlas">
-<meta property="og:title" content="深海图鉴 · Ocean Atlas — 3D 海洋生物图鉴">
-<meta property="og:description" content="按软骨鱼纲、辐鳍鱼纲、鲸目、头足纲等科目浏览：33 种海洋生物的 3D 互动图鉴。">
+<meta property="og:title" content="深海图鉴 · Ocean Atlas — 海洋博物馆">
+<meta property="og:description" content="从浅海礁盘走到深渊：三十三种海洋生物的 3D 策展。科目索引仍在，给想自己翻柜的人。">
 <meta property="og:url" content="https://hantrleko.github.io/ocean-atlas/">
 <meta property="og:image" content="https://hantrleko.github.io/ocean-atlas/og-image.png">
 <meta property="og:image:width" content="1200">
@@ -16,8 +16,8 @@
 <meta property="og:image:alt" content="深海图鉴 Ocean Atlas 网站截图：深海背景中的 3D 海洋生物">
 <meta property="og:locale" content="zh_CN">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="深海图鉴 · Ocean Atlas — 3D 海洋生物图鉴">
-<meta name="twitter:description" content="按科目浏览 33 种海洋生物的 3D 互动图鉴。">
+<meta name="twitter:title" content="深海图鉴 · Ocean Atlas — 海洋博物馆">
+<meta name="twitter:description" content="从浅海礁盘走到深渊：三十三种海洋生物的 3D 策展。">
 <meta name="twitter:image" content="https://hantrleko.github.io/ocean-atlas/og-image.png"><link rel="stylesheet" href="/src/style.css"></head>
 <body class="light">
 <canvas id="c"></canvas>
@@ -25,20 +25,51 @@
 <div id="backdrop" aria-hidden="true"></div>
 <aside id="left" class="glass">
   <div class="logo"><span class="mark"></span><div><b>深海图鉴</b><small>OCEAN ATLAS</small></div></div>
-  <div class="kicker">科目分类</div>
-  <nav id="nav"></nav>
-  <div class="feat" id="feat"><small>本期精选 · FEATURED</small><b id="featName"></b><i id="featLatin"></i><p id="featCap"></p><button id="featGo">探索 →</button></div>
+  <div class="kicker">策展路径</div>
+  <nav id="acts" aria-label="策展路径"></nav>
+  <div class="kicker">科目索引</div>
+  <nav id="nav" aria-label="科目索引"></nav>
+  <div class="feat" id="feat"><small id="featKicker">本展区专题 · FEATURED</small><b id="featName"></b><i id="featLatin"></i><p id="featCap"></p><button id="featGo" type="button">进入专题 →</button></div>
 </aside>
 <header id="carousel" class="carousel"></header>
+<section id="wing" aria-label="当前展区">
+  <small id="wingKicker">策展路径</small>
+  <b id="wingTitle">浅海礁盘</b>
+  <p id="wingCopy"></p>
+  <div class="wing-actions">
+    <button id="wingCont" type="button">继续</button>
+    <button id="wingNext" type="button" class="ghost">下一展区</button>
+  </div>
+</section>
 <div id="tools"><button id="bSearch" title="搜索">⌕</button><button id="bZoom" title="沉浸">⤢</button><button id="bReset" title="重置">↺</button><button id="bScale" type="button" title="比例对比" aria-pressed="false">潜水员</button><button id="bShare" type="button" title="分享" aria-label="分享当前物种">↗</button><span id="snd"><button id="bSound" type="button" title="开启声音" aria-label="开启声音" aria-pressed="false">🔇</button><label id="vol" title="音量"><span>音量</span><input id="volR" type="range" min="0" max="100" step="1" aria-label="音量"></label></span></div>
 <div id="sndHint" aria-live="polite"></div>
 <div id="scaleHint" aria-live="polite"></div>
 <div id="actions" role="tablist" aria-label="行为姿态"></div>
-<footer id="cap"><p id="caption"></p><div class="deg"><span class="ring"><span id="dot"></span></span><span id="degTxt">360° 拖动旋转 · 滚轮缩放</span></div></footer>
+<footer id="cap"><b id="spName"></b><p id="caption"></p><div class="deg"><span class="ring"><span id="dot"></span></span><span id="degTxt">360° 拖动旋转 · 滚轮缩放</span></div></footer>
+<div id="scaleOffer" hidden>
+  <p id="scaleOfferText"></p>
+  <button id="scaleOfferGo" type="button">看比例</button>
+  <button id="scaleOfferNo" type="button" aria-label="关闭比例提示">×</button>
+</div>
+<div id="share" hidden>
+  <div class="share-card" role="dialog" aria-modal="true" aria-labelledby="shareTitle">
+    <small>深海图鉴 · 可带走的一句</small>
+    <b id="shareTitle"></b>
+    <i id="shareLatin"></i>
+    <p id="shareLine"></p>
+    <code id="shareUrl"></code>
+    <div class="share-actions">
+      <button id="shareCopy" type="button">复制卡片</button>
+      <button id="shareSys" type="button">分享</button>
+      <button id="shareImg" type="button">保存图片</button>
+      <button id="shareClose" type="button" class="ghost">关闭</button>
+    </div>
+  </div>
+</div>
 <aside id="right" class="glass">
   <button id="sheetHandle" type="button" aria-label="展开详情" title="展开 / 收起"><span class="bar"></span></button>
   <div class="top"><div class="search"><span>⌕</span><input id="q" placeholder="搜索物种 / 拉丁名…"><div id="results"></div></div><button id="theme" title="切换主题"><span class="sun">☀</span><span class="moon">☾</span></button></div>
-  <div id="info"><small id="fam"></small><h1 id="title"></h1><i id="latin"></i><div id="tags"></div><p id="desc"></p>
+  <div id="info"><small id="fam"></small><h1 id="title"></h1><i id="latin"></i><p id="pull"></p><div id="tags"></div><p id="desc"></p>
    <h3>关键特征 · KEY TRAITS</h3><table id="traits"></table>
    <div class="detail"><canvas id="dc"></canvas><div><small>特写 · CLOSE-UP</small><b id="dTitle"></b><p id="dText"></p></div></div></div>
 </aside>

@@ -20,7 +20,7 @@ const AMB = {
 // species_behaviour → [file|synth, gain, rate, delay s]
 const SFX = {
   whale_song: ['whale-song', 1, 1, .3], whale_blow: ['whale-blow', .9, 1, .4], whale_lobtail: ['whale-lobtail', 1, 1, .9],
-  angler_strike: ['jaw-snap', 1, 1, .15], angler_lure: ['@hum', .5], angler_ambush: ['@ping', .25],
+  angler_strike: ['jaw-snap', 1, 1, .15], angler_lure: ['@hum', .5], angler_ambush: ['@hum', .28],
   vampire_flee: ['jet-whoosh', .9, 1, 0], vampire_cloak: ['jet-whoosh', .5, .7, 0], vampire_snow: ['@chime', .35],
   nautilus_jet: ['jet-whoosh', .9, .9, 0], nautilus_rise: ['bubbles', .6, 1, 0], nautilus_sink: ['bubbles', .4, .8, 0],
   turtle_breathe: ['bubbles', .8, 1, .2], turtle_graze: ['@crunch', .4],
@@ -34,7 +34,7 @@ const SFX = {
   manta_leap: ['whale-breach', .45, 1.3, 0], manta_glide: ['@hum', .25], manta_hover: ['bubbles', .3, 1.2, 0],
   frilled_shark_lunge: ['jaw-snap', .8, .85, .05], frilled_shark_slither: ['jet-whoosh', .35, .7, 0],
   oarfish_dive: ['bubbles', .4, .65, 0], oarfish_undulate: ['@hum', .32], oarfish_hover: ['@hum', .22],
-  clownfish_chase: ['jet-whoosh', .4, 1.3, 0], clownfish_fan: ['bubbles', .3, 1.4, 0],
+  clownfish_chase: ['jet-whoosh', .4, 1.3, 0], clownfish_fan: ['bubbles', .3, 1.4, 0], clownfish_nestle: ['bubbles', .28, 1.15, .15],
   seahorse_sip: ['@ping', .35], seahorse_dance: ['@chime', .35], seahorse_brood: ['bubbles', .3, .9, 0], seahorse_grip: ['@thud', .28],
   sunfish_dive: ['bubbles', .45, .8, 0], sunfish_bask: ['@hum', .25],
   blobfish_gulp: ['jaw-snap', .4, .6, .1], blobfish_drift: ['@hum', .2],
@@ -60,7 +60,9 @@ export function createAudio() {
   let ctx = null, master, ambBus, sfxBus, padBus, on = localStorage.oaSound === 'on', vol = +(localStorage.oaVol ?? .7);
   if (!(vol >= 0 && vol <= 1)) vol = .7;
   const buf = new Map(), pending = new Map();
-  let ambKey = null, ambNode = null, pad = null, species = null, unlocked = false;
+  let ambKey = null, ambNode = null, pad = null, species = null, unlocked = false, ambFilter = null;
+  // Habitat loudness: the abyss stays quieter and duller than a reef; camera distance opens the lowpass (near) or closes it (far).
+  const AMB_LEVEL = { abyss: 0.36, twilight: 0.46, reef: 0.7, open: 0.56, midwater: 0.48, surface: 0.62 };
   const listeners = new Set();
 
   function ensure() {
@@ -68,7 +70,9 @@ export function createAudio() {
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null;
     ctx = new AC();
     master = ctx.createGain(); master.gain.value = 0; master.connect(ctx.destination);
-    ambBus = ctx.createGain(); ambBus.gain.value = .55; ambBus.connect(master);
+    ambBus = ctx.createGain(); ambBus.gain.value = .55;
+    ambFilter = ctx.createBiquadFilter(); ambFilter.type = 'lowpass'; ambFilter.frequency.value = 1800; ambFilter.Q.value = .45;
+    ambBus.connect(ambFilter); ambFilter.connect(master);
     padBus = ctx.createGain(); padBus.gain.value = .18; padBus.connect(master);
     sfxBus = ctx.createGain(); sfxBus.gain.value = .9; sfxBus.connect(master);
     return ctx;
@@ -135,10 +139,28 @@ export function createAudio() {
   }
 
   function prefetch() { if (!ctx || !on || !species) return; filesFor(species.id).forEach(load); }
+  /**
+   * Depth / distance layering. `dist` is the camera's distance from the origin.
+   * Near (or immersive) opens the ambience; far and the abyss keep it muffled and quiet.
+   */
+  function setSpace(dist = 12, immersive = false) {
+    if (!ctx || !on || !ambFilter) return;
+    const amb = species?.amb || ambKey || 'abyss';
+    const near = Math.max(0, Math.min(1, (16 - dist) / 10));
+    const base = AMB_LEVEL[amb] ?? 0.5;
+    const gain = base * (0.78 + near * 0.38) * (immersive ? 1.08 : 1);
+    const open = amb === 'abyss' || amb === 'twilight' ? 720 : amb === 'reef' || amb === 'surface' ? 1600 : 1100;
+    const freq = open + near * (amb === 'reef' || amb === 'surface' ? 4600 : 2200);
+    const n = ctx.currentTime;
+    ambBus.gain.setTargetAtTime(gain, n, 0.35);
+    ambFilter.frequency.setTargetAtTime(freq, n, 0.4);
+    const padGain = amb === 'abyss' ? 0.1 : amb === 'twilight' ? 0.14 : 0.18;
+    padBus.gain.setTargetAtTime(padGain * (immersive ? 1.05 : 1), n, 0.45);
+  }
   function emit() { listeners.forEach(f => f(on, vol)); }
   async function setOn(v) {
     on = v; localStorage.oaSound = v ? 'on' : 'off';
-    if (v) { ensure(); if (ctx.state !== 'running') { try { await ctx.resume(); } catch {} } unlocked = ctx.state === 'running'; if (species) { setAmb(species.amb); prefetch(); } }
+    if (v) { ensure(); if (ctx.state !== 'running') { try { await ctx.resume(); } catch {} } unlocked = ctx.state === 'running'; if (species) { setAmb(species.amb); prefetch(); setSpace(); } }
     applyLevel(); emit();
   }
   // If the user previously chose "on", we still need a gesture before audio can start.
@@ -152,7 +174,8 @@ export function createAudio() {
     setVolume(v) { vol = Math.max(0, Math.min(1, v)); localStorage.oaVol = vol.toFixed(2); applyLevel(true); emit(); },
     onChange(f) { listeners.add(f); f(on, vol); },
     /** called on species switch */
-    setSpecies(id, amb) { species = { id, amb }; if (ctx && on) { setAmb(amb); prefetch(); } },
+    setSpecies(id, amb) { species = { id, amb }; if (ctx && on) { setAmb(amb); prefetch(); setSpace(); } },
+    setSpace,
     /** called when the active behaviour changes */
     behavior(sp, b) { const e = SFX[`${sp}_${b}`]; if (e) play(e[0], e[1], e[2] ?? 1, e[3] ?? 0); },
     splash(size = 1) { play(SPLASH, Math.min(1, .6 + size * .4), 1, 0); },
