@@ -7,7 +7,7 @@
 export const BEHAVIORS = {
   // ---- rigged (Blender clips) ----
   angler: [
-    { id: 'ambush', label: '伏击静候', hold: 6, view: { yaw: 0.7, pitch: 0.1, dist: 1.5 } },
+    { id: 'ambush', label: '伏击静候', hold: 6, view: { yaw: 0.82, pitch: 0.12, dist: -0.35 } },
     { id: 'lure', label: '诱饵摆动', hold: 6, view: { yaw: 0.7, pitch: 0.1, dist: 1.5 } },
     { id: 'strike', label: '猛扑吞食', hold: 5, view: { yaw: 0.7, pitch: 0.12, dist: 3.0, camY: 0.25, aimY: 0.0 } },
     { id: 'swim', label: '缓慢游动', hold: 5 },
@@ -22,7 +22,7 @@ export const BEHAVIORS = {
   turtle: [
     { id: 'swim', label: '划水巡游', hold: 5 },
     { id: 'breathe', label: '上浮换气', hold: 4.5 },
-    { id: 'graze', label: '啃食海草', hold: 7 },
+    { id: 'graze', label: '啃食海草', hold: 7, view: { yaw: 0.4, pitch: 0.38, dist: -0.2, aimY: -0.1 } },
     { id: 'rest', label: '休憩', hold: 6 },
   ],
   dumbo: [
@@ -36,7 +36,7 @@ export const BEHAVIORS = {
   // ---- procedural (static GLB + shader undulation + rigid fx) ----
   vampire: [
     { id: 'drift', label: '悬浮漂游', hold: 6, pose: [0.05, 0, 0], amp: 0.8, freq: 0.7, bob: 1, sway: 1, fx: { type: 'finpaddle', period: 2.2, mag: 0.1 } },
-    { id: 'snow', label: '收集海洋雪', hold: 6, pose: [0.5, 0, 0], amp: 0.5, freq: 0.5, bob: 0.4, sway: 0.4, fx: { type: 'sink', period: 6, mag: 0.18 } },
+    { id: 'snow', label: '收集海洋雪', hold: 6, view: { yaw: 0.25, pitch: 0.32, dist: -0.2 }, pose: [0.5, 0, 0], amp: 0.5, freq: 0.5, bob: 0.4, sway: 0.4, fx: { type: 'sink', period: 6, mag: 0.18 } },
     { id: 'cloak', label: '斗篷翻转', hold: 5, pose: [0, 0, 0], amp: 0.3, freq: 0.4, bob: 0.3, sway: 0.3, fx: { type: 'cloak', period: 3, mag: 0.35 } },
     { id: 'flee', label: '喷射逃逸', hold: 4, pose: [-0.2, 0, 0], amp: 1.6, freq: 2, bob: 0.6, sway: 0.6, fx: { type: 'jet', period: 1.3, mag: 0.45, spin: 1 } },
   ],
@@ -77,7 +77,7 @@ export const BEHAVIORS = {
   ],
   // ---- batch 1 rigged clips (id === Blender AnimationClip name) ----
   great_white: [
-    { id: 'breach', label: '突袭跃身', hold: 5, view: { dist: 3.2, mobDist: 5.2, frameY: 80, track: true } },
+    { id: 'breach', label: '突袭跃身', hold: 5, view: { yaw: 0.48, pitch: 0.02, dist: 3.2, mobDist: 5.2, frameY: 80, track: true } },
     { id: 'cruise', label: '巡游绕圈', hold: 6 },
     { id: 'bite', label: '张口咬合', hold: 5 },
     { id: 'roll', label: '侧翻露眼', hold: 5 },
@@ -101,7 +101,7 @@ export const BEHAVIORS = {
     { id: 'dive', label: '急速下潜', hold: 5.5, view: { yaw: 0.35, pitch: 0.22, dist: 0.7, track: true } },
   ],
   clownfish: [
-    { id: 'nestle', label: '钻进海葵', hold: 5 },
+    { id: 'nestle', label: '钻进海葵', hold: 5, view: { yaw: 1.02, pitch: 0.2, dist: -0.4 } },
     { id: 'fan', label: '护卵扇水', hold: 5 },
     { id: 'chase', label: '驱赶入侵者', hold: 4.5 },
   ],
@@ -153,7 +153,7 @@ export const BEHAVIORS = {
   giant_squid: [
     { id: 'lunge', label: '长腕捕猎', hold: 5, view: { yaw: 0.35, pitch: 0.22, dist: 0.35 } },
     { id: 'jet', label: '喷射推进', hold: 4.5, view: { yaw: 1.15, pitch: 0.05, dist: 1.2 } },
-    { id: 'duel', label: '对抗抹香鲸', hold: 6, view: { yaw: -0.4, pitch: 0.12, dist: 1.5 } },
+    { id: 'duel', label: '对抗抹香鲸', hold: 6, view: { yaw: 0.25, pitch: 0.1, dist: 0.2 } },
   ],
   octopus: [
     { id: 'camouflage', label: '变色伪装', hold: 5.5, view: { yaw: 0.25, pitch: 0.35, dist: -0.6 } },
@@ -205,7 +205,7 @@ export function behaviorLabelFor(id, bid) { return behaviorsFor(id).find(b => b.
 /** Short line under the stage while that behavior is showing. Empty → species blurb. */
 const BEHAVIOR_CAPTION = {
   angler: {
-    ambush: '它伏在黑暗里，只留一盏冷灯。',
+    ambush: '黑暗中唯一的灯，是一个温柔的陷阱。',
     lure: '饵球轻轻摆，像在跟路过的鱼打招呼。',
     strike: '嘴猛地张开，把光和猎物一起吞进去。',
     swim: '它慢慢挪开，头上的灯还在摇。',
@@ -220,7 +220,7 @@ const BEHAVIOR_CAPTION = {
   turtle: {
     swim: '前肢像桨，一下一下把水拨开。',
     breathe: '它浮上水面，探出头换气。',
-    graze: '低头啃食海草，像在草原上吃草。',
+    graze: '低头啃着海草。再远的沙滩，它也记得路。',
     rest: '停在水层里，四肢松松地垂着。',
   },
   dumbo: {
@@ -231,7 +231,7 @@ const BEHAVIOR_CAPTION = {
   },
   vampire: {
     drift: '斗篷张开，它在缺氧层里慢慢漂。',
-    snow: '细长的丝接着往下掉的海洋雪。',
+    snow: '名字骇人，它却只是在收海洋雪。',
     cloak: '腕间膜翻过来，身体缩成一颗球。',
     flee: '它喷出一股水，头也不回地逃开。',
   },
@@ -293,7 +293,7 @@ const BEHAVIOR_CAPTION = {
     dive: '它收起身体，迅速往更深的地方去。',
   },
   clownfish: {
-    nestle: '它钻进海葵的触手里，像回家。',
+    nestle: '它钻进会蜇人的触手里，把家安在刺与刺之间。',
     fan: '停在卵旁边，胸鳍把新鲜的水扇过去。',
     chase: '有谁靠得太近，它就冲出去赶走。',
   },
@@ -325,7 +325,7 @@ const BEHAVIOR_CAPTION = {
     spyhop: '头垂直探出水面，看一眼冰上。',
   },
   dolphin: {
-    leap: '它跃出船首的浪，在空中弯成一道弧。',
+    leap: '它跃出浪尖，在空中弯成一道弧。',
     surf: '身体贴着浪坡往前冲。',
     echolocate: '额隆发出一串咔嗒声，去找前面的鱼。',
     bubble: '它吐出一个会自己打转的泡泡环。',
@@ -344,7 +344,7 @@ const BEHAVIOR_CAPTION = {
   giant_squid: {
     lunge: '两条长腕伸出去，末端的吸盘张开。',
     jet: '外套膜一收，它往后弹开。',
-    duel: '腕缠上去，巨大的眼睛盯着抹香鲸。',
+    duel: '盘子一样大的眼睛，在暮光里盯着抹香鲸。',
   },
   octopus: {
     camouflage: '皮肤一眨眼，换成沙、藻和石头的颜色。',
