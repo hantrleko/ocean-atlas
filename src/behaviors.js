@@ -128,8 +128,8 @@ export const BEHAVIORS = {
     { id: 'cave', label: '洞穴休憩', hold: 6 },
   ],
   orca: [
-    { id: 'wavewash', label: '浪推海豹', hold: 5 },
-    { id: 'hunt', label: '群体围猎', hold: 5 },
+    { id: 'wavewash', label: '浪推浮冰', hold: 5 },
+    { id: 'hunt', label: '沿冰巡游', hold: 5 },
     { id: 'breach', label: '鲸跃', hold: 5, view: { dist: 3.2, mobDist: 5.2, frameY: 100, track: true } },
     { id: 'spyhop', label: '浮窥', hold: 6, view: { pitch: 0.12, dist: 1.8, mobDist: 2.6, track: true } },
   ],
@@ -140,7 +140,7 @@ export const BEHAVIORS = {
     { id: 'bubble', label: '泡泡环', hold: 5 },
   ],
   sperm_whale: [
-    { id: 'sleep', label: '垂直睡眠', hold: 6, rate: 0.5, view: { yaw: 1.15, pitch: 0.12, dist: 2.2, mobDist: 3.4, track: true } },
+    { id: 'sleep', label: '垂直睡眠', hold: 6, rate: 0.5, view: { yaw: 0.72, pitch: 0.18, dist: 3.2, mobDist: 4.6, track: false } },
     { id: 'dive', label: '深潜捕乌贼', hold: 5.5, rate: 1.1, view: { yaw: 0.8, dist: 2.8, mobDist: 4.4, frameY: 40, track: true } },
     { id: 'blow', label: '喷气换气', hold: 5, rate: 1, view: { yaw: 0.5, pitch: 0.18, dist: 0.6 } },
     { id: 'click', label: '喀哒定位', hold: 5.5, rate: 1.55, view: { yaw: 0.22, pitch: 0.1, dist: -0.8 } },
@@ -153,7 +153,7 @@ export const BEHAVIORS = {
   giant_squid: [
     { id: 'lunge', label: '长腕捕猎', hold: 5, view: { yaw: 0.35, pitch: 0.22, dist: 0.35 } },
     { id: 'jet', label: '喷射推进', hold: 4.5, view: { yaw: 1.15, pitch: 0.05, dist: 1.2 } },
-    { id: 'duel', label: '对抗抹香鲸', hold: 6, view: { yaw: 0.25, pitch: 0.1, dist: 0.2 } },
+    { id: 'duel', label: '暮光对视', hold: 6, view: { yaw: 0.25, pitch: 0.1, dist: 0.2 } },
   ],
   octopus: [
     { id: 'camouflage', label: '变色伪装', hold: 5.5, view: { yaw: 0.25, pitch: 0.35, dist: -0.6 } },
@@ -319,8 +319,8 @@ const BEHAVIOR_CAPTION = {
     cave: '它退回岩洞的阴影里，停住。',
   },
   orca: {
-    wavewash: '尾鳍拍打浮冰边缘，浪把海豹冲下来。',
-    hunt: '黑白的家族排开，围住同一条鱼。',
+    wavewash: '尾鳍拍向浮冰的边缘，浪从这一头推出去。',
+    hunt: '一头虎鲸沿着冰缘巡过。家族的捕法写在墙上，这一柜只有它。',
     breach: '它整条跃出水面，再重重落下。',
     spyhop: '头垂直探出水面，看一眼冰上。',
   },
@@ -344,7 +344,7 @@ const BEHAVIOR_CAPTION = {
   giant_squid: {
     lunge: '两条长腕伸出去，末端的吸盘张开。',
     jet: '外套膜一收，它往后弹开。',
-    duel: '盘子一样大的眼睛，在暮光里盯着抹香鲸。',
+    duel: '盘子一样大的眼睛对着暮光。抹香鲸在另一柜。',
   },
   octopus: {
     camouflage: '皮肤一眨眼，换成沙、藻和石头的颜色。',

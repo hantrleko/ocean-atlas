@@ -12,7 +12,8 @@ import { behaviorCaption } from './behaviors.js';
 import { frameFor, distToContain } from './framing.js';
 import { createDiver, DIVER_HEIGHT_M } from './diver.js';
 import { sizeOf } from './sizes.js';
-import { ACTS, actOf, actIndex, nextAct, flagshipOf, lineOf } from './journey.js';
+import { ACTS, actOf, actIndex, nextAct, flagshipOf, lineOf, wingMembers, isGuest, pairOf, SEASON } from './journey.js';
+import { loadPassport, markVisit, allWingsSeen, markSeason, passportSummary } from './passport.js';
 
 const $ = s => document.querySelector(s), body = document.body;
 const canvas = $('#c'), R = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
@@ -150,16 +151,24 @@ function visibleIndices() {
   if (browse === 'all') return SPECIES.map((_, i) => i);
   if (browse === 'group') return indicesOf(groupFilter);
   const act = ACTS.find(a => a.id === actId) || ACTS[0];
-  return act.ids.map(id => SPECIES.findIndex(s => s.id === id)).filter(i => i >= 0);
+  return wingMembers(act).map(id => SPECIES.findIndex(s => s.id === id)).filter(i => i >= 0);
 }
 
 function renderCarousel() {
   const journey = browse === 'journey';
+  const act = ACTS.find(a => a.id === actId);
+  const pass = loadPassport();
   $('#carousel').innerHTML = visibleIndices().map(i => {
     const s = SPECIES[i];
-    const flag = journey && flagshipOf(s.id) ? ' flag' : '';
-    return `<div class="card${flag}" data-i="${i}"><span class="thumb" style="--t:${THUMB[s.id] || '#8899aa'}"></span><b>${s.name}</b><i>${s.latin}</i></div>`;
+    const flag = flagshipOf(s.id);
+    const flagCls = journey && flag ? ' flag' : '';
+    const seenCls = flag ? (pass.flagships[s.id] ? ' seen' : ' unseen') : '';
+    const guest = journey && isGuest(act, s.id);
+    const guestCls = guest ? ' guest' : '';
+    const sub = guest ? `${s.latin} · 借展` : s.latin;
+    return `<div class="card${flagCls}${seenCls}${guestCls}" data-i="${i}"><span class="thumb" style="--t:${THUMB[s.id] || '#8899aa'}"></span><b>${s.name}</b><i>${sub}</i></div>`;
   }).join('');
+  paintSeals();
 }
 
 function markNav() {
@@ -177,8 +186,8 @@ function markNav() {
 function focusSpecies(i) {
   const s = SPECIES[i];
   if (browse === 'journey') {
-    const act = actOf(s.id);
-    if (act.id !== actId) { actId = act.id; renderCarousel(); }
+    const act = ACTS.find(a => a.id === actId);
+    if (!act || !wingMembers(act).includes(s.id)) { actId = actOf(s.id).id; renderCarousel(); }
   } else if (browse === 'group' && s.group !== groupFilter) {
     groupFilter = s.group;
     renderCarousel();
@@ -259,12 +268,55 @@ function navBuild() {
     if (browse !== 'journey') { backToJourney(); return; }
     goAct(nextAct(actId).id);
   });
+  $('#season')?.addEventListener('click', e => {
+    const b = e.target.closest('button[data-id]');
+    if (!b) return;
+    const id = b.dataset.id;
+    const act = b.dataset.act;
+    const i = SPECIES.findIndex(s => s.id === id);
+    if (i < 0) return;
+    browse = 'journey';
+    if (ACTS.some(a => a.id === act)) actId = act;
+    markSeason();
+    renderCarousel();
+    select(i);
+    if (isMobile()) closeNav();
+  });
   renderCarousel();
   paintWing();
   updateFeat();
+  paintSeason();
+}
+
+function paintSeals() {
+  const p = loadPassport();
+  document.querySelectorAll('#acts button').forEach(b => b.classList.toggle('seen', !!p.wings[b.dataset.act]));
+  document.querySelectorAll('#carousel .card').forEach(c => {
+    const s = SPECIES[+c.dataset.i];
+    const flag = s && flagshipOf(s.id);
+    c.classList.toggle('unseen', !!(flag && !p.flagships[s.id]));
+    c.classList.toggle('seen', !!(flag && p.flagships[s.id]));
+  });
+  const seal = $('#wingSeal');
+  if (seal) seal.hidden = !(browse === 'journey' && p.wings[actId]);
+}
+
+function paintSeason() {
+  const el = $('#season');
+  if (!el) return;
+  const dots = SEASON.stops.map(stop => {
+    const s = SPECIES.find(x => x.id === stop.id);
+    if (!s) return '';
+    const on = browse === 'journey' && actId === stop.act && SPECIES[idx]?.id === stop.id;
+    const guest = isGuest(ACTS.find(a => a.id === stop.act), stop.id);
+    return `<button type="button" data-act="${stop.act}" data-id="${stop.id}" class="${on ? 'on' : ''}">${s.name}${guest ? ' · 借' : ''}</button>`;
+  }).join('<span class="season-dot" aria-hidden="true">·</span>');
+  el.innerHTML = `<span class="season-k">${SEASON.kicker}</span><b>${SEASON.title}</b><span class="season-stops">${dots}</span>`;
 }
 
 function paintWing() {
+  paintSeason();
+  paintSeals();
   const kicker = $('#wingKicker'), title = $('#wingTitle'), copy = $('#wingCopy');
   const cont = $('#wingCont'), next = $('#wingNext');
   if (!kicker || !title || !copy) return;
@@ -274,13 +326,19 @@ function paintWing() {
     const nxt = nextAct(act.id);
     const idxs = visibleIndices();
     const atEnd = idxs.length > 0 && idxs[idxs.length - 1] === idx;
+    const pos = idxs.indexOf(idx);
+    const nextSpecies = pos >= 0 ? SPECIES[idxs[pos + 1]] : null;
+    const partner = pairOf(SPECIES[idx]?.id);
+    const nudge = !atEnd && partner && nextSpecies?.id === partner.id;
     kicker.textContent = `${act.kicker} · ${String(n + 1).padStart(2, '0')} / ${String(ACTS.length).padStart(2, '0')}`;
     title.textContent = act.title;
     copy.textContent = act.copy;
+    const seal = $('#wingSeal');
+    if (seal) seal.hidden = !loadPassport().wings[act.id];
     if (cont) {
       cont.hidden = false;
-      cont.textContent = atEnd ? `前往${nxt.title}` : '继续';
-      cont.title = atEnd ? `进入${nxt.title}` : '本展区下一件';
+      cont.textContent = atEnd ? `前往${nxt.title}` : (nudge ? `对看 · ${partner.label}` : '继续');
+      cont.title = atEnd ? `进入${nxt.title}` : (nudge ? partner.note : '本展区下一件');
     }
     if (next) {
       next.hidden = false;
@@ -326,11 +384,14 @@ function updateFeat() {
   };
 }
 
+let invalidDeepLink = '';
+
 function indexFromSearch(hp) {
   const id = hp.get('id');
   if (id) {
     const i = SPECIES.findIndex(s => s.id === id);
     if (i >= 0) return i;
+    invalidDeepLink = id.length > 32 ? `${id.slice(0, 32)}…` : id;
   }
   const s = hp.get('s');
   if (s != null && s !== '') {
@@ -339,6 +400,16 @@ function indexFromSearch(hp) {
   }
   const lead = SPECIES.findIndex(s => s.id === ACTS[0].lead);
   return lead >= 0 ? lead : 0;
+}
+
+function actFromSearch(hp, speciesIndex) {
+  const id = SPECIES[speciesIndex]?.id;
+  const wing = hp.get('wing');
+  if (id && wing) {
+    const act = ACTS.find(a => a.id === wing);
+    if (act && wingMembers(act).includes(id)) return act.id;
+  }
+  return actOf(id).id;
 }
 
 function syncTitle(s) {
@@ -350,9 +421,15 @@ function syncTitle(s) {
 
 function writeDeepLink(id) {
   const url = new URL(location.href);
-  if (url.searchParams.get('id') === id && !url.searchParams.has('s')) return;
+  const act = ACTS.find(a => a.id === actId);
+  const guest = browse === 'journey' && isGuest(act, id);
+  const sameId = url.searchParams.get('id') === id && !url.searchParams.has('s');
+  const sameWing = guest ? url.searchParams.get('wing') === actId : !url.searchParams.has('wing');
+  if (sameId && sameWing) return;
   url.searchParams.set('id', id);
   url.searchParams.delete('s');
+  if (guest) url.searchParams.set('wing', actId);
+  else url.searchParams.delete('wing');
   history.replaceState(null, '', url.pathname + url.search + url.hash);
 }
 
@@ -412,7 +489,12 @@ function info(s) {
     $('#fam').textContent = g ? `${g.zh} · ${s.family}` : s.family; $('#title').textContent = s.name;
     $('#latin').textContent = `${s.latin} · ${s.en}`;
     const hab = habitatLabel(s.id);
-    $('#tags').innerHTML = s.tags.map(t => `<span>${t}</span>`).join('') + (hab ? `<span>${hab}</span>` : '');
+    const act = ACTS.find(a => a.id === actId);
+    const guest = browse === 'journey' && isGuest(act, s.id);
+    $('#tags').innerHTML = s.tags.map(t => `<span>${t}</span>`).join('')
+      + (hab ? `<span>${hab}</span>` : '')
+      + (guest ? '<span>本季借展</span>' : '');
+    paintPair(s);
     $('#desc').textContent = s.desc;
     $('#traits').innerHTML = Object.entries(s.traits).map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
     $('#dTitle').textContent = s.detail.title; $('#dText').textContent = s.detail.text;
@@ -422,21 +504,91 @@ function info(s) {
     const card = document.querySelector('#info .detail');
     if (card) card.hidden = !!s.detail.hide;
     syncCaption(s);
+    paintPair(s);
   }, 240);
+  paintPair(s);
   markNav();
 }
 
+function dropCreature(o, keepId) {
+  if (!o?.g) return;
+  try { o.mixer?.stopAllAction(); } catch { /* mixer already torn down */ }
+  o.g.removeFromParent();
+  disposeCloneMaterials(o.g);
+  if (!o.g.userData.fromGlb) o.g.traverse(obj => { obj.geometry?.dispose(); });
+  else if (isMobile() && o.s && o.s.id !== keepId) releaseCreature(o.s.id);
+}
+
+/** 换柜之前先把上一只从舞台上卸干净。不允许两只模型同时留在展柜里。 */
+function evictStage() {
+  const doomed = [];
+  if (cur) doomed.push(cur);
+  for (const f of flights) if (f.o && !doomed.includes(f.o)) doomed.push(f.o);
+  flights.length = 0;
+  for (const o of doomed) dropCreature(o, null);
+  cur = null;
+  diver.visible = false;
+  scaleFit = null;
+  hideStandIn();
+}
+
+function paintPair(species) {
+  const p = species ? pairOf(species.id) : null;
+  for (const id of ['pair', 'pairCap']) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    if (!p) { el.hidden = true; el.dataset.id = ''; continue; }
+    el.hidden = false;
+    el.textContent = `对看 · ${p.label}`;
+    el.title = p.note || '';
+    el.dataset.id = p.id;
+  }
+}
+
+function goPair(partnerId) {
+  const i = SPECIES.findIndex(s => s.id === partnerId);
+  if (i < 0) return;
+  const here = ACTS.find(a => a.id === actId);
+  const stay = browse === 'journey' && here && wingMembers(here).includes(partnerId);
+  browse = 'journey';
+  if (!stay) actId = actOf(partnerId).id;
+  renderCarousel();
+  select(i);
+  if (isMobile()) closeNav();
+}
+
+function viewingHabitat(speciesId) {
+  if (browse !== 'journey') return null;
+  const act = ACTS.find(a => a.id === actId);
+  if (act && isGuest(act, speciesId) && act.env) return act.env;
+  return null;
+}
+
 async function select(i, instant) {
-  if (cur && i === idx && !instant) return;
-  idx = i;
   const s = SPECIES[i];
-  focusSpecies(i);
+  if (!s) return;
+  if (cur && i === idx && !instant) {
+    // 同一只，但可能从户籍翼改走到借展（或反过来）。铭牌跟着展区走，模型不重载。
+    envx.set(s.id, false, viewingHabitat(s.id));
+    body.classList.toggle('env-dark', !!envx.preset().dark);
+    audio.setSpecies(s.id, envx.preset().amb);
+    writeDeepLink(s.id);
+    info(s);
+    paintWing();
+    updateFeat();
+    if (browse === 'journey') markVisit(actId, s.id);
+    paintSeals();
+    return;
+  }
   const token = ++loadToken;
+  // 先卸掉上一只，再改铭牌。加载中舞台上不留旧模型。
+  evictStage();
+  idx = i;
+  focusSpecies(i);
   const moment = flagshipOf(s.id);
   actionMode = moment?.behavior || 'auto';
   applyFrame(s.id, true, instant);
   scaleFor = s.id;
-  if (cur?.g) cur.g.position.x = 0;
   diver.visible = false;
   scaleFit = null;
   refreshScaleHint(s);
@@ -446,45 +598,57 @@ async function select(i, instant) {
   considerScaleNudge(s);
   rebuildActions(s.id);
   info(s);
-  envx.set(s.id, instant);
+  envx.set(s.id, instant, viewingHabitat(s.id));
   body.classList.toggle('env-dark', !!envx.preset().dark);
   audio.setSpecies(s.id, envx.preset().amb);
   lastBeh = null;
   applyTheme();
   vY = instant ? 0 : 0.05;
-  let n;
-  // Loading overlay: only appears if the model isn't cached and takes >120 ms
+  body.classList.add('staging');
+  showStandIn(s.id);
   const cached = isCached(s.id);
-  if (!cached) showStandIn(s.id);
-  else hideStandIn();
-  const showT = cached ? 0 : setTimeout(() => loader.show(s.name), 120);
+  if (!cached) loader.show(s.name);
+  let n;
   try {
     n = await loadCreature(s.id, f => { if (token === loadToken) loader.set(f); });
   } catch (err) {
     console.warn('loadCreature failed, procedural fallback', err);
     n = build(s.id);
   }
-  clearTimeout(showT);
-  if (token === loadToken) { loader.hide(); hideStandIn(); }
   if (token !== loadToken) {
-    disposeCloneMaterials(n.g);
-    if (!n.g.userData.fromGlb) n.g.traverse(o => { o.geometry?.dispose(); });
-    else if (isMobile() && cur?.s?.id !== s.id) releaseCreature(s.id);
+    dropCreature(n, null);
     return;
   }
-  if (cur) flights.push({ o: cur, t: 0, out: true });
+  loader.hide();
+  hideStandIn();
+  body.classList.remove('staging');
   n.s = s;
+  n.g.position.set(0, 0, 0);
+  n.g.rotation.set(0, 0, 0);
+  n.g.scale.set(1, 1, 1);
   stage.add(n.g);
-  flights.push({ o: n, t: instant ? 1 : 0, out: false });
   cur = n;
   applyActionMode();
   syncCaption(s);
+  refineLargeFrame(n.g, s.id);
   if (s.id === 'giant_squid') refineSquidFrame(n.g);
+  const here = ACTS.find(a => a.id === actId);
+  const inWing = browse === 'journey' && here && wingMembers(here).includes(s.id);
+  markVisit(inWing ? actId : null, s.id);
+  paintSeals();
+  paintWing();
   if (n.refineFit) n.refineFit(fit => {
     if (token !== loadToken || cur !== n) return;
     n.fit = fit;
     mobFrame.key = '';
   });
+  if (s.id === 'sperm_whale' || s.id === 'giant_squid' || s.id === 'whale' || s.id === 'lionsmane') {
+    setTimeout(() => {
+      if (token !== loadToken || cur !== n) return;
+      refineLargeFrame(n.g, s.id);
+      if (s.id === 'giant_squid') refineSquidFrame(n.g);
+    }, 480);
+  }
   prefetchNeighbors(i, token);
 }
 
@@ -608,9 +772,11 @@ $('#bReset').onclick = () => {
 addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     if ($('#share') && !$('#share').hidden) { closeShare(); return; }
+    if ($('#passport') && !$('#passport').hidden) { closePassport(); return; }
     $('#bReset').onclick();
   }
-  if (e.target.tagName !== 'INPUT' && ($('#share')?.hidden !== false)) {
+  const cardOpen = ($('#share') && !$('#share').hidden) || ($('#passport') && !$('#passport').hidden);
+  if (e.target.tagName !== 'INPUT' && !cardOpen) {
     if (e.key === 'ArrowRight') stepVisible(1);
     if (e.key === 'ArrowLeft') stepVisible(-1);
   }
@@ -777,6 +943,8 @@ function stageBox(obj) {
 
 function layoutScale() {
   if (!scaleOn || !cur?.g) { diver.visible = false; scaleFit = null; return; }
+  const extras = stage.children.filter(o => o !== diver && o !== standIn && o !== cur.g);
+  if (extras.length) { diver.visible = false; scaleFit = null; return; }
   cur.g.position.x = 0;
   cur.g.updateMatrixWorld(true);
   const box = stageBox(cur.g);
@@ -850,6 +1018,27 @@ function stageGap() {
   return Math.max(0.4, (innerWidth - 304 - 378) / innerWidth);
 }
 
+const LARGE_FRAME = new Set(['sperm_whale', 'whale', 'giant_squid', 'orca', 'lionsmane']);
+
+/** 大型或竖起来的动物：只把镜头拉远，不把已经取好的景推近。 */
+function refineLargeFrame(obj, id) {
+  if (!obj || scaleOn || !LARGE_FRAME.has(id)) return;
+  const box = stageBox(obj);
+  if (box.isEmpty()) return;
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const pad = id === 'sperm_whale' ? 1.46 : 1.22;
+  const D = distToContain(
+    { x: Math.max(size.x, 0.2) / 2, y: Math.max(size.y, 0.2) / 2, z: Math.max(size.z, 0.2) / 2 },
+    { yaw: rotY, pitch: rotX * 0.5, fov: frameFov, aspect: Math.max(0.6, cam.aspect), gap: stageGap(), pad },
+  );
+  if (D > frameDist + 0.25) {
+    frameDist = D;
+    frameAimY = center.y * 0.45;
+    dist = Math.max(dist, frameDist);
+  }
+}
+
 /** Pull the default camera back until the squid's mantle fits the gap between the panels. */
 function refineSquidFrame(obj) {
   const box = stageBox(obj);
@@ -904,16 +1093,136 @@ async function copyText(text) {
     return ok;
   }
 }
+function shareContext(s) {
+  const here = ACTS.find(a => a.id === actId);
+  const act = (browse === 'journey' && here && wingMembers(here).includes(s.id)) ? here : actOf(s.id);
+  const guest = isGuest(act, s.id);
+  const flag = flagshipOf(s.id);
+  const mode = cur?.s?.id === s.id
+    ? (actionMode === 'auto' ? (cur.active?.() || 'auto') : actionMode)
+    : actionMode;
+  const moment = flag && mode === flag.behavior ? flag.moment : '';
+  const wing = guest ? `${act.title} · 借展` : (act?.title || '');
+  return { act, guest, moment, wing };
+}
 function sharePayload(s) {
   const url = new URL(location.href);
   url.searchParams.set('id', s.id);
   url.searchParams.delete('s');
+  const ctx = shareContext(s);
+  if (ctx.guest) url.searchParams.set('wing', ctx.act.id);
+  else url.searchParams.delete('wing');
   const line = lineOf(s);
-  const card = `${s.name}\n${line}\n${s.latin}\n${url.toString()}`;
+  const card = [ctx.wing, ctx.moment, s.name, line, s.latin, url.toString()].filter(Boolean).join('\n');
+  const text = [ctx.wing, ctx.moment, s.name, line].filter(Boolean).join('\n');
   return {
-    s, line, url: url.toString(), card,
-    data: { title: `${s.name} · 深海图鉴`, text: `${s.name}\n${line}`, url: url.toString() },
+    s, line, url: url.toString(), card, ctx,
+    data: { title: `${s.name} · 深海图鉴`, text, url: url.toString() },
   };
+}
+const CARD_FONT = '"WenQuanYi Micro Hei","Noto Sans SC","PingFang SC",sans-serif';
+function grabStill() {
+  try {
+    composer.render();
+    const side = Math.min(canvas.width, canvas.height);
+    const shot = document.createElement('canvas');
+    shot.width = side;
+    shot.height = side;
+    const sx = Math.max(0, (canvas.width - side) / 2);
+    const maxSy = Math.max(0, canvas.height - side);
+    const sy = Math.min(maxSy, Math.max(0, (canvas.height - side) * 0.35));
+    shot.getContext('2d').drawImage(canvas, sx, sy, side, side, 0, 0, side, side);
+    return shot;
+  } catch (err) {
+    console.warn('stage capture failed', err);
+    return null;
+  }
+}
+function roundImage(g, img, x, y, w, h, r) {
+  g.save();
+  g.beginPath();
+  g.moveTo(x + r, y);
+  g.arcTo(x + w, y, x + w, y + h, r);
+  g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r);
+  g.arcTo(x, y, x + w, y, r);
+  g.closePath();
+  g.clip();
+  g.drawImage(img, x, y, w, h);
+  g.restore();
+}
+function wrapText(g, text, x, y, max, lineH, limit) {
+  const lines = [];
+  let curLine = '';
+  for (const ch of text) {
+    if (g.measureText(curLine + ch).width > max) { lines.push(curLine); curLine = ch; }
+    else curLine += ch;
+  }
+  if (curLine) lines.push(curLine);
+  lines.slice(0, limit).forEach((ln, n) => g.fillText(ln, x, y + n * lineH));
+  return Math.min(lines.length, limit);
+}
+function paintMuseumCard(c, { kicker, wing, moment, title, latin, line, url, still, extra }) {
+  const g = c.getContext('2d');
+  const W = c.width, H = c.height;
+  const grd = g.createLinearGradient(0, 0, W, H);
+  grd.addColorStop(0, '#071422');
+  grd.addColorStop(0.55, '#0c3048');
+  grd.addColorStop(1, '#14324a');
+  g.fillStyle = grd;
+  g.fillRect(0, 0, W, H);
+  const pad = Math.round(W * 0.072);
+  g.fillStyle = '#7ec8d4';
+  g.font = `500 ${Math.round(W * 0.028)}px ${CARD_FONT}`;
+  g.fillText(kicker || '深海图鉴  ·  OCEAN ATLAS', pad, Math.round(H * 0.07));
+  let y = Math.round(H * 0.1);
+  g.font = `500 ${Math.round(W * 0.026)}px ${CARD_FONT}`;
+  const chips = [wing, moment].filter(Boolean);
+  chips.forEach(chip => {
+    const tw = g.measureText(chip).width + 28;
+    g.strokeStyle = 'rgba(183,212,222,.55)';
+    g.lineWidth = 2;
+    g.strokeRect(pad, y, tw, Math.round(H * 0.032));
+    g.fillStyle = '#d5e8f0';
+    g.fillText(chip, pad + 14, y + Math.round(H * 0.023));
+    y += Math.round(H * 0.046);
+  });
+  const imgTop = y + Math.round(H * 0.02);
+  const imgH = extra?.length ? Math.round(H * 0.22) : Math.round(H * 0.4);
+  const imgW = W - pad * 2;
+  if (still) roundImage(g, still, pad, imgTop, imgW, imgH, 28);
+  else {
+    g.fillStyle = '#0a2236';
+    g.fillRect(pad, imgTop, imgW, imgH);
+  }
+  y = imgTop + imgH + Math.round(H * 0.06);
+  g.fillStyle = '#f4fbff';
+  g.font = `600 ${Math.round(W * 0.064)}px ${CARD_FONT}`;
+  g.fillText(title || '', pad, y);
+  y += Math.round(H * 0.04);
+  g.fillStyle = '#9fb6c2';
+  g.font = `italic ${Math.round(W * 0.03)}px ${CARD_FONT}`;
+  g.fillText(latin || '', pad, y);
+  y += Math.round(H * 0.05);
+  g.fillStyle = '#f7fbff';
+  g.font = `italic ${Math.round(W * 0.038)}px ${CARD_FONT}`;
+  const used = wrapText(g, line || '', pad, y, W - pad * 2, Math.round(H * 0.042), extra?.length ? 2 : 4);
+  y += used * Math.round(H * 0.042) + Math.round(H * 0.02);
+  if (extra) {
+    g.fillStyle = '#c5d8e2';
+    g.font = `${Math.round(W * 0.026)}px ${CARD_FONT}`;
+    extra.slice(0, 16).forEach(row => { g.fillText(row, pad, y); y += Math.round(H * 0.03); });
+  }
+  g.fillStyle = '#6f8e9c';
+  g.font = `${Math.round(W * 0.024)}px ${CARD_FONT}`;
+  const shown = (url || '').replace(/^https?:\/\//, '');
+  g.fillText(shown.length > 64 ? `${shown.slice(0, 64)}…` : shown, pad, H - Math.round(H * 0.045));
+}
+function downloadCanvas(c, name) {
+  const a = document.createElement('a');
+  a.href = c.toDataURL('image/png');
+  a.download = name;
+  a.click();
 }
 function openShare() {
   const s = cur?.s || SPECIES[idx];
@@ -922,10 +1231,25 @@ function openShare() {
   $('#shareTitle').textContent = s.name;
   $('#shareLatin').textContent = `${s.latin} · ${s.en}`;
   $('#shareLine').textContent = p.line;
-  $('#shareUrl').textContent = p.url;
+  $('#shareUrl').textContent = p.url.replace(/^https?:\/\//, '');
+  const wing = $('#shareWing');
+  if (wing) wing.textContent = p.ctx.wing;
+  const moment = $('#shareMoment');
+  if (moment) {
+    moment.hidden = !p.ctx.moment;
+    moment.textContent = p.ctx.moment || '';
+  }
+  const still = grabStill();
+  const img = $('#shareStill');
+  if (img) {
+    img.src = still ? still.toDataURL('image/png') : '';
+    img.alt = still ? `${s.name}的展柜静帧` : '';
+    img.hidden = !still;
+  }
   const root = $('#share');
   root.hidden = false;
   root.dataset.card = p.card;
+  root._still = still;
   $('#shareSys').hidden = !navigator.share;
 }
 function closeShare() {
@@ -952,46 +1276,68 @@ $('#shareImg')?.addEventListener('click', () => {
   if (!s) return;
   const p = sharePayload(s);
   const c = document.createElement('canvas');
-  c.width = 1200; c.height = 630;
-  const g = c.getContext('2d');
-  const grd = g.createLinearGradient(0, 0, 1200, 630);
-  grd.addColorStop(0, '#071422');
-  grd.addColorStop(0.55, '#0c3048');
-  grd.addColorStop(1, '#14324a');
-  g.fillStyle = grd;
-  g.fillRect(0, 0, 1200, 630);
-  const font = '"WenQuanYi Micro Hei","Noto Sans SC","PingFang SC",sans-serif';
-  g.fillStyle = '#7ec8d4';
-  g.font = `500 22px ${font}`;
-  g.fillText('深海图鉴  ·  OCEAN ATLAS', 72, 86);
-  const act = actOf(s.id);
-  g.fillStyle = '#b7d4de';
-  g.font = `20px ${font}`;
-  if (act) g.fillText(act.title, 72, 128);
-  g.fillStyle = '#f4fbff';
-  g.font = `600 64px ${font}`;
-  g.fillText(s.name, 72, 230);
-  g.fillStyle = '#9fb6c2';
-  g.font = `italic 28px ${font}`;
-  g.fillText(s.latin, 72, 280);
-  g.fillStyle = '#f7fbff';
-  g.font = `italic 36px ${font}`;
-  const max = 1040;
-  const lines = [];
-  let curLine = '';
-  for (const ch of p.line) {
-    if (g.measureText(curLine + ch).width > max) { lines.push(curLine); curLine = ch; }
-    else curLine += ch;
+  c.width = 1080;
+  c.height = 1440;
+  paintMuseumCard(c, {
+    kicker: '深海图鉴  ·  OCEAN ATLAS',
+    wing: p.ctx.wing,
+    moment: p.ctx.moment,
+    title: s.name,
+    latin: s.latin,
+    line: p.line,
+    url: p.url,
+    still: $('#share')._still || grabStill(),
+  });
+  downloadCanvas(c, `ocean-atlas-${s.id}.png`);
+});
+function onPairClick(e) {
+  const id = e.currentTarget.dataset.id;
+  if (id) goPair(id);
+}
+document.getElementById('pair')?.addEventListener('click', onPairClick);
+document.getElementById('pairCap')?.addEventListener('click', onPairClick);
+function passportRows() {
+  const sum = passportSummary();
+  const wings = sum.wings.map(w => `${w.seen ? '过' : '·'}  ${w.title}`);
+  const flags = sum.flagships.map(f => `${f.seen ? '看' : '·'}  ${f.name} · ${f.moment}`);
+  return { sum, wings, flags };
+}
+function openPassport() {
+  const { sum, wings, flags } = passportRows();
+  const bodyEl = $('#passBody');
+  if (bodyEl) {
+    bodyEl.innerHTML = `<p class="pass-note">${SEASON.copy}</p>`
+      + `<h3>展区</h3><ul>${wings.map(w => `<li>${w}</li>`).join('')}</ul>`
+      + `<h3>旗舰</h3><ul>${flags.map(w => `<li>${w}</li>`).join('')}</ul>`
+      + `<p class="pass-note">${sum.seasonSeen ? '本季特展走过了。' : '本季特展还没停过。'}</p>`;
   }
-  if (curLine) lines.push(curLine);
-  lines.slice(0, 3).forEach((ln, n) => g.fillText(ln, 72, 380 + n * 52));
-  g.fillStyle = '#6f8e9c';
-  g.font = `22px ${font}`;
-  g.fillText(p.url.replace(/^https?:\/\//, ''), 72, 560);
-  const a = document.createElement('a');
-  a.href = c.toDataURL('image/png');
-  a.download = `ocean-atlas-${s.id}.png`;
-  a.click();
+  const root = $('#passport');
+  if (root) root.hidden = false;
+}
+function closePassport() {
+  const root = $('#passport');
+  if (root) root.hidden = true;
+}
+$('#bPass')?.addEventListener('click', openPassport);
+$('#passClose')?.addEventListener('click', closePassport);
+$('#passport')?.addEventListener('click', e => { if (e.target.id === 'passport') closePassport(); });
+$('#passImg')?.addEventListener('click', () => {
+  const { sum, wings, flags } = passportRows();
+  const c = document.createElement('canvas');
+  c.width = 1080;
+  c.height = 1440;
+  paintMuseumCard(c, {
+    kicker: '深海图鉴  ·  展区护照',
+    wing: '我走过的路',
+    moment: sum.seasonTitle,
+    title: '护照',
+    latin: '没有积分，只有路过的灯',
+    line: '四翼还在原来的地方。',
+    url: location.href,
+    still: grabStill(),
+    extra: ['展区', ...wings, '旗舰', ...flags, sum.seasonSeen ? `${sum.seasonKicker} · 走过` : `${sum.seasonKicker} · 未停`],
+  });
+  downloadCanvas(c, 'ocean-atlas-passport.png');
 });
 
 function formatMeters(m) {
@@ -1195,12 +1541,14 @@ function loop() {
   if (cur && !flights.some(f => f.o === cur)) cur.up(t, dt);
   if (scaleOn && scaleFit && cur?.g) cur.g.position.x = -scaleFit.shiftX;
   pm.uniforms.t.value = t;
-  const beh = cur && !flights.some(f => f.o === cur) ? cur.active?.() : null;
-  envx.update(t, dt, { beh, cur, lights: LB, fog: scene.fog, renderer: R, camDist: Math.max(dist, cam.position.length()) });
+  let beh = null;
+  if (cur && !flights.some(f => f.o === cur)) beh = cur.active?.() || null;
+  const roomBeh = beh || (!cur && actionMode !== 'auto' ? actionMode : null);
+  envx.update(t, dt, { beh: roomBeh, cur, lights: LB, fog: scene.fog, renderer: R, camDist: Math.max(dist, cam.position.length()) });
   hemi.intensity = LB.hemiBase * LB.hemiMul / 1.3; key.intensity = LB.keyBase * LB.keyMul;
   if (audio.on && fr % 8 === 0) audio.setSpace?.(cam.position.length(), imm);
   if (beh && beh !== lastBeh) {
-    if (lastBeh !== null || actionMode !== 'auto') audio.behavior(cur.s.id, beh);
+    if (cur && (lastBeh !== null || actionMode !== 'auto')) audio.behavior(cur.s.id, beh);
     lastBeh = beh;
     if (actionMode === 'auto') syncCaption();
   }
@@ -1212,6 +1560,8 @@ function loop() {
     window.__oa.beh = beh; window.__oa.env = envx.id; window.__oa.audio = audio; window.__oa.emit = envx.emit; window.__oa.trackY = cur?.trackY?.();
     let meshes = 0;
     cur?.g?.traverse(o => { if (o.isMesh) meshes++; });
+    window.__oa.creatures = stage.children.filter(o => o !== diver && o !== standIn).length;
+    window.__oa.stand = standIn.visible;
     window.__oa.scale = {
       on: scaleOn, settled, forId: scaleFor, sid: cur?.s?.id, flights: flights.length, meshes,
       fit: scaleFit && { dist: +scaleFit.dist.toFixed(2), aimY: +scaleFit.aimY.toFixed(2), shiftX: +scaleFit.shiftX.toFixed(2), id: scaleFit.id },
@@ -1260,10 +1610,28 @@ if (hp.get('theme') === 'light') { body.classList.add('light'); body.classList.r
 syncMobileChrome();
 applyTheme();
 idx = indexFromSearch(hp);
-actId = actOf(SPECIES[idx].id).id;
+actId = actFromSearch(hp, idx);
 browse = 'journey';
+const returnVisit = allWingsSeen();
 navBuild();
 select(idx, true).then(() => {
   if (hp.get('imm')) { tZoom = -4.4; setImm(true); }
+  if (invalidDeepLink) {
+    sayHint(`没有「${invalidDeepLink}」这一柜，先从${SPECIES[idx].name}看起。`);
+    invalidDeepLink = '';
+  }
+  if (returnVisit) {
+    let seenHello = false;
+    try { seenHello = sessionStorage.getItem('oaHello') === '1'; } catch { seenHello = true; }
+    if (!seenHello) {
+      try { sessionStorage.setItem('oaHello', '1'); } catch { /* 隐私模式 */ }
+      const hello = $('#hello');
+      if (hello) {
+        hello.hidden = false;
+        hello.textContent = '四翼都走过了。灯还在原来的地方。这一季，冰缘多了两件借展。';
+        setTimeout(() => { hello.hidden = true; }, 5600);
+      }
+    }
+  }
 });
 loop();
