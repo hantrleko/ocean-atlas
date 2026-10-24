@@ -44,6 +44,8 @@
 </section>
 <div id="tools"><button id="bSearch" title="搜索">⌕</button><button id="bZoom" title="沉浸">⤢</button><button id="bReset" title="重置">↺</button><button id="bScale" type="button" title="比例对比" aria-pressed="false">潜水员</button><button id="bShare" type="button" title="分享" aria-label="分享当前物种">↗</button><span id="snd"><button id="bSound" type="button" title="开启声音" aria-label="开启声音" aria-pressed="false">🔇</button><label id="vol" title="音量"><span>音量</span><input id="volR" type="range" min="0" max="100" step="1" aria-label="音量"></label></span></div>
 <div id="sndHint" aria-live="polite"></div>
+<button id="voSkip" type="button" hidden>跳过旁白</button>
+<p id="ear" hidden></p>
 <div id="scaleHint" aria-live="polite"></div>
 <div id="actions" role="tablist" aria-label="行为姿态"></div>
 <footer id="cap"><b id="spName"></b><p id="caption"></p><button id="pairCap" type="button" hidden>对看</button><div class="deg"><span class="ring"><span id="dot"></span></span><span id="degTxt">360° 拖动旋转 · 滚轮缩放</span></div></footer>
@@ -77,6 +79,16 @@
    <h3>关键特征 · KEY TRAITS</h3><table id="traits"></table>
    <div class="detail"><canvas id="dc"></canvas><div><small>特写 · CLOSE-UP</small><b id="dTitle"></b><p id="dText"></p></div></div></div>
 </aside>
+<div id="trailer" hidden>
+  <div class="share-card" role="dialog" aria-modal="true" aria-labelledby="trailerTitle">
+    <small>本季特展</small>
+    <b id="trailerTitle">预告</b>
+    <video id="trailerVid" controls playsinline preload="none"></video>
+    <div class="share-actions">
+      <button id="trailerClose" type="button" class="ghost">关闭</button>
+    </div>
+  </div>
+</div>
 <div id="passport" hidden>
   <div class="share-card" role="dialog" aria-modal="true" aria-labelledby="passTitle">
     <small>深海图鉴 · 展区护照</small>

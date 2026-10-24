@@ -130,7 +130,7 @@ const ENV = {
     snow: 0xf4fbff, snowOp: 0.45, specks: 0.12, speckCol: 0xe8f7ff,
     bed: 0.35, bedCol: 0xd5e4ee, bedY: -2.3, bedTilt: 0, caus: 0.35, causCol: 0xf4fbff,
     grass: 0, rocks: 0.15, rays: 0.85, water: 0.35, waterY: 1.6, ceil: 0.55, ceilY: 2.6,
-    hemi: [0xf4fbff, 0x4a7890, 1.35], key: [0xf7fbff, 2.0], exposure: 1.08, amb: 'open',
+    hemi: [0xf4fbff, 0x4a7890, 1.35], key: [0xf7fbff, 2.0], exposure: 1.08, amb: 'ice',
   },
   jellyfish_bloom: {
     top: 0x3a78c8, hor: 0x163868, bot: 0x071428, fog: 0.03, surf: 0.35, sun: 0.35,

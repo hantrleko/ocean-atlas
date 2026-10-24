@@ -44,14 +44,23 @@ export const ACTS = [
 ];
 
 /**
- * 本季特展。换季只改这一段：一句说明，和 3–5 个可跨翼的停靠。
- * `act` 是打开时走哪一翼（借展停在极地，不把户籍改过去）。
+ * 本季特展。换季只改这一个对象，不必改四翼户籍，也不必改 main.js 的接线：
+ * 1. id / kicker / title / copy — 名称和墙上那一句。
+ * 2. stops — 3 到 5 个 { id, act }。act 是打开时走哪一翼；借展不要写进该翼的 ids。
+ * 3. amb — 环境音 key，对应 audio.js 的 AMB（冰缘是 ice，文件 public/audio/amb-ice.mp3）。
+ *    停在本季某一停靠上时用它，所以换季不用改调用处。栖息地预设里的 amb 只是兜底。
+ * 4. loanSting — 走进借展物种时的一声短耳标，文件 public/audio/<loanSting>.mp3。
+ * 5. trailer — 可选预告，相对站点根。public/media/season-trailer.mp4 不在时按钮不出现。
+ * 海报可另换。新的 GLB 不从这里生成。
  */
 export const SEASON = {
   id: 'polar-loan-2026',
   kicker: '本季特展',
   title: '冰缘来客',
   copy: '四翼的位置不动。只把冷水里说得通的几件，暂时借到冰缘灯下走走。',
+  amb: 'ice',
+  loanSting: 'sting-loan',
+  trailer: 'media/season-trailer.mp4',
   stops: [
     { id: 'orca', act: 'polar' },
     { id: 'whale', act: 'polar' },
@@ -70,10 +79,13 @@ export const PAIRS = [
       sperm_whale: '它要下潜去找的那双眼睛，在暮光里。',
       giant_squid: '盯着它的那头鲸，头朝上睡在更深的地方。',
     },
+    sting: 'sting-whale-squid',
   },
   {
     a: 'leatherback',
     b: 'lionsmane',
+    // 这一对是棱皮龟和狮鬃水母。绿海龟和水母没有单独的对看柜，耳标就挂在这里。
+    sting: 'sting-turtle-jelly',
     label: { leatherback: '狮鬃水母', lionsmane: '棱皮龟' },
     note: {
       leatherback: '冷水里它追的就是这种水母。这一季可以走到冰缘去看。',
@@ -82,7 +94,10 @@ export const PAIRS = [
   },
 ];
 
-/** 旗舰：默认姿态与墙上那一句对齐。scale 只用于「请潜水员站过来」的一次提示。 */
+/**
+ * 旗舰：默认姿态与墙上那一句对齐。scale 只用于「请潜水员站过来」的一次提示。
+ * 旁白只服务这八件，文件是 public/audio/vo-<id>.mp3。打开该瞬间时播一次，不循环。
+ */
 export const FLAGSHIPS = [
   { id: 'clownfish', behavior: 'nestle', moment: '钻进海葵', scale: 'tiny' },
   { id: 'great_white', behavior: 'breach', moment: '从光下跃身', scale: 'large' },
@@ -151,10 +166,27 @@ export function isGuest(act, speciesId) {
 
 export function pairOf(speciesId) {
   for (const p of PAIRS) {
-    if (p.a === speciesId) return { id: p.b, label: p.label[speciesId], note: p.note[speciesId] };
-    if (p.b === speciesId) return { id: p.a, label: p.label[speciesId], note: p.note[speciesId] };
+    if (p.a === speciesId) return { id: p.b, label: p.label[speciesId], note: p.note[speciesId], sting: p.sting || '' };
+    if (p.b === speciesId) return { id: p.a, label: p.label[speciesId], note: p.note[speciesId], sting: p.sting || '' };
   }
   return null;
+}
+
+/** 从一柜走到对看的那一柜时，该响的短耳标。不是对看则没有。 */
+export function stingOf(fromId, toId) {
+  if (!fromId || !toId || fromId === toId) return '';
+  const p = PAIRS.find(x => (x.a === fromId && x.b === toId) || (x.b === fromId && x.a === toId));
+  return p?.sting || '';
+}
+
+/**
+ * 换季环境音。当前这件是本季停靠、并且正站在它的 act 里时，返回 SEASON.amb。
+ * 否则返回空字符串，调用处继续用栖息地自己的 amb。
+ */
+export function seasonAmbFor(actId, speciesId) {
+  if (!SEASON.amb || !actId || !speciesId) return '';
+  const hit = (SEASON.stops || []).some(s => s.id === speciesId && s.act === actId);
+  return hit ? SEASON.amb : '';
 }
 
 export function actIndex(id) {
@@ -193,9 +225,10 @@ export function assertJourney() {
     const act = ACTS.find(a => a.id === s.act);
     return !all.includes(s.id) || !act || !wingMembers(act).includes(s.id);
   }).map(s => s.id);
-  const badSeason = stops.length < 3 || stops.length > 5;
-  if (missing.length || extra.length || dup.length || badLead.length || badFlag.length || missingLine.length || badGuest.length || guestDup.length || badPair.length || badStop.length || badSeason) {
-    const msg = JSON.stringify({ missing, extra, dup, badLead, badFlag, missingLine, badGuest, guestDup, badPair, badStop, badSeason });
+  const badSeason = stops.length < 3 || stops.length > 5 || !SEASON.amb || !SEASON.loanSting || !SEASON.trailer;
+  const badSting = PAIRS.filter(p => !p.sting).map(p => `${p.a}:${p.b}`);
+  if (missing.length || extra.length || dup.length || badLead.length || badFlag.length || missingLine.length || badGuest.length || guestDup.length || badPair.length || badStop.length || badSeason || badSting.length) {
+    const msg = JSON.stringify({ missing, extra, dup, badLead, badFlag, missingLine, badGuest, guestDup, badPair, badStop, badSeason, badSting });
     throw new Error(`[journey] ${msg}`);
   }
 }

@@ -4,6 +4,9 @@
  * - Choice + volume persisted in localStorage (oaSound = 'on' | 'off', oaVol = 0..1).
  * - Ambience files are lazy-fetched per environment, SFX lazy-fetched per species, and
  *   only once sound is on. A quiet synth pad (the "music" bed) and a few synth SFX need no files.
+ * - Flagship plaques (`vo-<id>`), pair/loan stings, and the passport whisper are one-shots.
+ *   They follow the master mute, never loop, and stop when the listener leaves or skips.
+ *   Browsers that prefer AAC still fall back to the mp3 on disk.
  */
 const BASE = import.meta.env.BASE_URL + 'audio/';
 const EXT = (() => { const a = document.createElement('audio'); return a.canPlayType('audio/mp4; codecs="mp4a.40.2"') ? 'm4a' : 'mp3'; })();
@@ -16,6 +19,8 @@ const AMB = {
   midwater: { f: 'amb-midwater', chord: [87.3, 130.8, 174.6, 220], lp: 800, pad: .5 },
   surface: { f: 'amb-surface', chord: [146.8, 220, 293.7, 370], lp: 1300, pad: .22 },
   twilight: { f: 'amb-twilight', chord: [73.4, 110, 146.8, 174.6], lp: 600, pad: .5 },
+  // polar_ice_edge. Cold wind, distant ice, no gulls. File: public/audio/amb-ice.mp3
+  ice: { f: 'amb-ice', chord: [49, 73.4, 98, 130.8], lp: 460, pad: .36 },
 };
 // species_behaviour → [file|synth, gain, rate, delay s]
 const SFX = {
@@ -61,8 +66,10 @@ export function createAudio() {
   if (!(vol >= 0 && vol <= 1)) vol = .7;
   const buf = new Map(), pending = new Map();
   let ambKey = null, ambNode = null, pad = null, species = null, unlocked = false, ambFilter = null;
+  let voiceBus = null, voiceToken = 0, voiceHalt = null;
+  const voiceWatch = new Set();
   // Habitat loudness: the abyss stays quieter and duller than a reef; camera distance opens the lowpass (near) or closes it (far).
-  const AMB_LEVEL = { abyss: 0.36, twilight: 0.46, reef: 0.7, open: 0.56, midwater: 0.48, surface: 0.62 };
+  const AMB_LEVEL = { abyss: 0.36, twilight: 0.46, ice: 0.4, reef: 0.7, open: 0.56, midwater: 0.48, surface: 0.62 };
   const listeners = new Set();
 
   function ensure() {
@@ -75,14 +82,28 @@ export function createAudio() {
     ambBus.connect(ambFilter); ambFilter.connect(master);
     padBus = ctx.createGain(); padBus.gain.value = .18; padBus.connect(master);
     sfxBus = ctx.createGain(); sfxBus.gain.value = .9; sfxBus.connect(master);
+    voiceBus = ctx.createGain(); voiceBus.gain.value = 1; voiceBus.connect(master);
     return ctx;
   }
   function load(name) {
     if (buf.has(name)) return Promise.resolve(buf.get(name));
     if (pending.has(name)) return pending.get(name);
-    const p = fetch(`${BASE}${name}.${EXT}`).then(r => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
-      .then(a => new Promise((res, rej) => ctx.decodeAudioData(a, res, rej)))
-      .then(b => { buf.set(name, b); pending.delete(name); return b; })
+    const fetchExt = async ext => {
+      const r = await fetch(`${BASE}${name}.${ext}`);
+      const type = (r.headers.get('content-type') || '').toLowerCase();
+      // Vite serves index.html with 200 for a missing file. That is not audio.
+      if (!r.ok || type.includes('text/html') || type.startsWith('text/')) throw new Error(`${r.status} ${type || 'unknown'}`);
+      return r.arrayBuffer();
+    };
+    const p = (async () => {
+      let raw;
+      try { raw = await fetchExt(EXT); }
+      catch (err) {
+        if (EXT === 'mp3') throw err;
+        raw = await fetchExt('mp3');
+      }
+      return await new Promise((res, rej) => ctx.decodeAudioData(raw.slice(0), res, rej));
+    })().then(b => { buf.set(name, b); pending.delete(name); return b; })
       .catch(e => { pending.delete(name); console.warn('[audio]', name, e?.message || e); return null; });
     pending.set(name, p); return p;
   }
@@ -149,17 +170,47 @@ export function createAudio() {
     const near = Math.max(0, Math.min(1, (16 - dist) / 10));
     const base = AMB_LEVEL[amb] ?? 0.5;
     const gain = base * (0.78 + near * 0.38) * (immersive ? 1.08 : 1);
-    const open = amb === 'abyss' || amb === 'twilight' ? 720 : amb === 'reef' || amb === 'surface' ? 1600 : 1100;
-    const freq = open + near * (amb === 'reef' || amb === 'surface' ? 4600 : 2200);
+    const cold = amb === 'abyss' || amb === 'twilight' || amb === 'ice';
+    const open = cold ? (amb === 'ice' ? 860 : 720) : amb === 'reef' || amb === 'surface' ? 1600 : 1100;
+    const freq = open + near * (amb === 'reef' || amb === 'surface' ? 4600 : amb === 'ice' ? 1400 : 2200);
     const n = ctx.currentTime;
     ambBus.gain.setTargetAtTime(gain, n, 0.35);
     ambFilter.frequency.setTargetAtTime(freq, n, 0.4);
-    const padGain = amb === 'abyss' ? 0.1 : amb === 'twilight' ? 0.14 : 0.18;
+    const padGain = amb === 'abyss' ? 0.1 : amb === 'ice' ? 0.11 : amb === 'twilight' ? 0.14 : 0.18;
     padBus.gain.setTargetAtTime(padGain * (immersive ? 1.05 : 1), n, 0.45);
   }
   function emit() { listeners.forEach(f => f(on, vol)); }
+  function voicePlaying(v) { voiceWatch.forEach(fn => { try { fn(v); } catch { /* listener */ } }); }
+  function haltVoice() {
+    voiceToken += 1;
+    const halt = voiceHalt;
+    voiceHalt = null;
+    if (halt) { try { halt(); } catch { /* already stopped */ } }
+    voicePlaying(false);
+  }
+  /** One-shot speech. Never loops. Master mute and haltVoice both cut it off. */
+  async function voice(name, gain = 0.88) {
+    if (!on || !name) return false;
+    ensure();
+    if (!ctx) return false;
+    if (ctx.state !== 'running') { try { await ctx.resume(); } catch { /* autoplay */ } }
+    if (!on || ctx.state !== 'running') return false;
+    const my = ++voiceToken;
+    if (voiceHalt) { try { voiceHalt(); } catch { /* already stopped */ } voiceHalt = null; }
+    const b = await load(name);
+    if (!b || !on || my !== voiceToken) return false;
+    const src = ctx.createBufferSource(), g = ctx.createGain();
+    src.buffer = b; src.loop = false; g.gain.value = gain;
+    src.connect(g).connect(voiceBus);
+    src.onended = () => { if (my !== voiceToken) return; voiceHalt = null; voicePlaying(false); };
+    try { src.start(); } catch { return false; }
+    voiceHalt = () => { try { src.stop(); } catch { /* ended */ } try { g.disconnect(); } catch { /* ended */ } };
+    voicePlaying(true);
+    return true;
+  }
   async function setOn(v) {
     on = v; localStorage.oaSound = v ? 'on' : 'off';
+    if (!v) haltVoice();
     if (v) { ensure(); if (ctx.state !== 'running') { try { await ctx.resume(); } catch {} } unlocked = ctx.state === 'running'; if (species) { setAmb(species.amb); prefetch(); setSpace(); } }
     applyLevel(); emit();
   }
@@ -179,6 +230,18 @@ export function createAudio() {
     /** called when the active behaviour changes */
     behavior(sp, b) { const e = SFX[`${sp}_${b}`]; if (e) play(e[0], e[1], e[2] ?? 1, e[3] ?? 0); },
     splash(size = 1) { play(SPLASH, Math.min(1, .6 + size * .4), 1, 0); },
+    /** Short pair / loan ear-tag. One-shot, muted with the master switch. */
+    async sting(name, gain = 0.8) {
+      if (!name || !on) return false;
+      if (!ensure() || !ctx) return false;
+      if (ctx.state !== 'running') { try { await ctx.resume(); } catch { /* autoplay */ } }
+      if (!on || ctx.state !== 'running') return false;
+      return play(name, gain, 1, 0);
+    },
+    /** Flagship plaque or passport whisper. `gain` is relative to the voice bus. */
+    voice,
+    skipVoice() { haltVoice(); },
+    onVoice(fn) { voiceWatch.add(fn); },
     _debug: () => ({ ctx: ctx?.state, ambKey, loaded: [...buf.keys()], ext: EXT }),
   };
 }
