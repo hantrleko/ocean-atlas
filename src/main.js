@@ -12,7 +12,7 @@ import { behaviorCaption } from './behaviors.js';
 import { frameFor, distToContain } from './framing.js';
 import { createDiver, DIVER_HEIGHT_M } from './diver.js';
 import { sizeOf } from './sizes.js';
-import { ACTS, actOf, actIndex, nextAct, flagshipOf, lineOf, wingMembers, isGuest, pairOf, stingOf, seasonAmbFor, SEASON } from './journey.js';
+import { ACTS, actOf, actIndex, nextAct, flagshipOf, plaqueOf, lineOf, wingMembers, isGuest, pairOf, stingOf, seasonAmbFor, SEASON } from './journey.js';
 import { loadPassport, markVisit, allWingsSeen, markSeason, passportSummary } from './passport.js';
 
 const $ = s => document.querySelector(s), body = document.body;
@@ -268,7 +268,13 @@ function navBuild() {
     if (browse !== 'journey') { backToJourney(); return; }
     goAct(nextAct(actId).id);
   });
-  $('#trailerHero')?.addEventListener('click', () => openTrailer());
+  $('#trailerHero')?.addEventListener('click', e => {
+    if (e.target.closest('.trailer-fold')) {
+      setTrailerOpen(!$('#trailerHero')?.classList.contains('is-open'));
+      return;
+    }
+    if (e.target.closest('.trailer-playhit, .trailer-card')) openTrailer();
+  });
   $('#season')?.addEventListener('click', e => {
     if (e.target.closest('[data-trailer]')) { openTrailer(); return; }
     const b = e.target.closest('button[data-id]');
@@ -623,20 +629,47 @@ function trailerSrc() {
 function posterSrc() {
   return SEASON.poster ? import.meta.env.BASE_URL + SEASON.poster : '';
 }
+const TRAILER_FOLD_KEY = 'oaTrailerFold';
+function trailerOpenPref() {
+  try {
+    const v = localStorage.getItem(TRAILER_FOLD_KEY);
+    if (v === 'open') return true;
+    if (v === 'shut') return false;
+  } catch { /* 隐私模式 */ }
+  return false;
+}
+function applyTrailerFold(open) {
+  const hero = $('#trailerHero');
+  const body = $('#trailerBody');
+  if (!hero) return;
+  hero.classList.toggle('is-open', !!open);
+  if (body) body.hidden = !open;
+  hero.querySelectorAll('.trailer-fold').forEach(btn => {
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+}
+function setTrailerOpen(open) {
+  try { localStorage.setItem(TRAILER_FOLD_KEY, open ? 'open' : 'shut'); } catch { /* 隐私模式 */ }
+  applyTrailerFold(open);
+}
 function paintTrailerHero() {
   const hero = $('#trailerHero');
   if (!hero) return;
   hero.hidden = !trailerReady;
   const kicker = SEASON.kicker || '本季特展';
   const title = SEASON.title || '本季预告';
-  const k = hero.querySelector('.trailer-k');
-  const b = hero.querySelector('.trailer-t');
-  if (k) k.textContent = kicker;
-  if (b) b.textContent = title;
-  hero.setAttribute('aria-label', `${kicker} ${title}，点按播放预告`);
+  hero.querySelectorAll('.trailer-k').forEach(k => { k.textContent = kicker; });
+  hero.querySelectorAll('.trailer-t').forEach(b => { b.textContent = title; });
+  const playLabel = `${kicker} ${title}，播放预告`;
+  hero.querySelector('.trailer-playhit')?.setAttribute('aria-label', playLabel);
+  hero.querySelector('.trailer-card')?.setAttribute('aria-label', playLabel);
   const img = $('#trailerPoster');
   const poster = posterSrc();
-  if (img && poster && img.getAttribute('src') !== poster) img.src = poster;
+  if (img) {
+    img.alt = poster ? `${title}预告静帧` : '';
+    if (poster && img.getAttribute('src') !== poster) img.src = poster;
+  }
+  applyTrailerFold(trailerOpenPref());
 }
 /** 预告跟馆内总开关走：静音时画面可以看，声音不自己响。 */
 function applyTrailerSound() {
@@ -766,7 +799,7 @@ async function select(i, instant) {
   focusSpecies(i);
   const fromId = audioFrom;
   audioFrom = s.id;
-  const moment = flagshipOf(s.id);
+  const moment = flagshipOf(s.id) || plaqueOf(s.id);
   actionMode = moment?.behavior || 'auto';
   void armCues(s.id, fromId);
   applyFrame(s.id, true, instant);
@@ -1282,10 +1315,13 @@ function shareContext(s) {
   const act = (browse === 'journey' && here && wingMembers(here).includes(s.id)) ? here : actOf(s.id);
   const guest = isGuest(act, s.id);
   const flag = flagshipOf(s.id);
+  const plaque = plaqueOf(s.id);
   const mode = cur?.s?.id === s.id
     ? (actionMode === 'auto' ? (cur.active?.() || 'auto') : actionMode)
     : actionMode;
-  const moment = flag && mode === flag.behavior ? flag.moment : '';
+  const moment = (flag && mode === flag.behavior && flag.moment)
+    || (plaque && mode === plaque.behavior && plaque.moment)
+    || '';
   const wing = guest ? `${act.title} · 借展` : (act?.title || '');
   return { act, guest, moment, wing };
 }
@@ -1346,7 +1382,48 @@ function wrapText(g, text, x, y, max, lineH, limit) {
   lines.slice(0, limit).forEach((ln, n) => g.fillText(ln, x, y + n * lineH));
   return Math.min(lines.length, limit);
 }
-function paintMuseumCard(c, { kicker, wing, moment, title, latin, line, url, still, extra }) {
+function paintQuietSeal(g, W, label) {
+  if (!label) return;
+  const cx = W - Math.round(W * 0.13);
+  const cy = Math.round(W * 0.13);
+  const r = Math.round(W * 0.055);
+  g.save();
+  g.translate(cx, cy);
+  g.rotate(-0.24);
+  g.globalAlpha = 0.86;
+  g.strokeStyle = '#e7b2a8';
+  g.lineWidth = Math.max(2, W * 0.003);
+  g.beginPath();
+  g.arc(0, 0, r, 0, Math.PI * 2);
+  g.stroke();
+  g.beginPath();
+  g.arc(0, 0, r - Math.max(5, W * 0.009), 0, Math.PI * 2);
+  g.stroke();
+  g.fillStyle = '#f3c9c1';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.font = `600 ${Math.round(r * 0.36)}px ${CARD_FONT}`;
+  const top = label.slice(0, 2);
+  const bot = label.slice(2);
+  g.fillText(top, 0, bot ? -r * 0.2 : 0);
+  if (bot) g.fillText(bot, 0, r * 0.24);
+  g.restore();
+}
+function seasonSealFor(speciesId) {
+  const on = (SEASON.stops || []).some(stop => stop.id === speciesId);
+  return on ? (SEASON.kicker || '本季特展') : '';
+}
+function fillSeal(el, label) {
+  if (!el) return;
+  el.hidden = !label;
+  if (!label) return;
+  const top = document.createElement('i');
+  const bot = document.createElement('i');
+  top.textContent = label.slice(0, 2);
+  bot.textContent = label.slice(2);
+  el.replaceChildren(top, bot);
+}
+function paintMuseumCard(c, { kicker, wing, moment, title, latin, line, url, still, extra, seal }) {
   const g = c.getContext('2d');
   const W = c.width, H = c.height;
   const grd = g.createLinearGradient(0, 0, W, H);
@@ -1401,6 +1478,7 @@ function paintMuseumCard(c, { kicker, wing, moment, title, latin, line, url, sti
   g.font = `${Math.round(W * 0.024)}px ${CARD_FONT}`;
   const shown = (url || '').replace(/^https?:\/\//, '');
   g.fillText(shown.length > 64 ? `${shown.slice(0, 64)}…` : shown, pad, H - Math.round(H * 0.045));
+  paintQuietSeal(g, W, seal);
 }
 function downloadCanvas(c, name) {
   const a = document.createElement('a');
@@ -1434,6 +1512,7 @@ function openShare() {
   root.hidden = false;
   root.dataset.card = p.card;
   root._still = still;
+  fillSeal($('#shareSeal'), seasonSealFor(s.id));
   $('#shareSys').hidden = !navigator.share;
 }
 function closeShare() {
@@ -1471,6 +1550,7 @@ $('#shareImg')?.addEventListener('click', () => {
     line: p.line,
     url: p.url,
     still: $('#share')._still || grabStill(),
+    seal: seasonSealFor(s.id),
   });
   downloadCanvas(c, `ocean-atlas-${s.id}.png`);
 });
@@ -1497,6 +1577,7 @@ function openPassport() {
       + `<h3>旗舰</h3><ul>${flags.map(w => `<li>${w}</li>`).join('')}</ul>`
       + `<p class="pass-note">${sum.seasonSeen ? '本季特展走过了。' : '本季特展还没停过。'}</p>`;
   }
+  fillSeal($('#passSeal'), SEASON.kicker || '本季特展');
   const root = $('#passport');
   if (root) root.hidden = false;
   if (back) void maybeWelcome();
@@ -1523,6 +1604,7 @@ $('#passImg')?.addEventListener('click', () => {
     url: location.href,
     still: grabStill(),
     extra: ['展区', ...wings, '旗舰', ...flags, sum.seasonSeen ? `${sum.seasonKicker} · 走过` : `${sum.seasonKicker} · 未停`],
+    seal: sum.seasonKicker || '本季特展',
   });
   downloadCanvas(c, 'ocean-atlas-passport.png');
 });

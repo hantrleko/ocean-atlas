@@ -50,8 +50,8 @@ export const ACTS = [
  * 3. amb — 环境音 key，对应 audio.js 的 AMB（冰缘是 ice，文件 public/audio/amb-ice.mp3）。
  *    停在本季某一停靠上时用它，所以换季不用改调用处。栖息地预设里的 amb 只是兜底。
  * 4. loanSting — 走进借展物种时的一声短耳标，文件 public/audio/<loanSting>.mp3。
- * 5. trailer — 可选预告，相对站点根。文件不在时，门厅卡片和换季条按钮都不出现。
- *    poster — 可选静帧。门厅卡片用它，点按才打开对话框，不自动播放、不循环。
+ * 5. trailer — 可选预告，相对站点根。文件不在时，门厅条和换季条按钮都不出现。
+ *    poster — 可选静帧。门厅默认收成一行，展开才看见静帧。点播放才打开对话框，不自动播放、不循环。
  * 新的 GLB 不从这里生成。
  */
 export const SEASON = {
@@ -111,6 +111,14 @@ export const FLAGSHIPS = [
   { id: 'vampire', behavior: 'snow', moment: '收集海洋雪', scale: 'tiny' },
 ];
 
+/**
+ * 轻铭牌。打开时锁定已有剪辑，分享卡可以带瞬间名。
+ * 不进 FLAGSHIPS：不进护照旗舰名单，也不播 vo-<id>。
+ */
+export const PLAQUES = [
+  { id: 'orca', behavior: 'breach', moment: '沿冰跃出' },
+];
+
 /** 分享卡片上的金句。舞台字幕仍走行为说明，避免两套文案抢同一行。 */
 export const LINES = {
   dumbo: '深海里最慢的飞行，用的是一对耳朵。',
@@ -133,7 +141,7 @@ export const LINES = {
   sunfish: '没有尾巴的圆盘，侧躺着把太阳晒进身体。',
   blobfish: '在高压里它是一条鱼，被捞上来才变成果冻。',
   coelacanth: '六千六百万年的空白之后，它还在洞里倒立着漂。',
-  orca: '黑白的家族沿着冰缘排开，把同一套捕法传下去。',
+  orca: '它沿着冰缘跃出水面，再落回冷水里。',
   dolphin: '跃出浪尖的那一下，它还带回一个泡泡环。',
   sperm_whale: '巨大的头朝上竖在水里，它就这样睡觉。',
   leatherback: '背上不是甲，是七条皮革一样的纵棱。',
@@ -204,6 +212,10 @@ export function flagshipOf(speciesId) {
   return FLAGSHIPS.find(f => f.id === speciesId) || null;
 }
 
+export function plaqueOf(speciesId) {
+  return PLAQUES.find(p => p.id === speciesId) || null;
+}
+
 export function lineOf(species) {
   if (!species) return '';
   return LINES[species.id] || species.caption || '';
@@ -217,6 +229,7 @@ export function assertJourney() {
   const dup = ids.filter((id, i) => ids.indexOf(id) !== i);
   const badLead = ACTS.filter(a => !a.ids.includes(a.lead)).map(a => a.id);
   const badFlag = FLAGSHIPS.filter(f => !all.includes(f.id) || !BEHAVIORS[f.id]?.some(b => b.id === f.behavior)).map(f => f.id);
+  const badPlaque = PLAQUES.filter(p => FLAGSHIPS.some(f => f.id === p.id) || !all.includes(p.id) || !p.moment || !BEHAVIORS[p.id]?.some(b => b.id === p.behavior)).map(p => p.id);
   const missingLine = all.filter(id => !LINES[id]);
   const guests = ACTS.flatMap(a => a.guests || []);
   const badGuest = ACTS.filter(a => (a.guests || []).some(id => !all.includes(id) || !ids.includes(id) || a.ids.includes(id) || !a.env)).map(a => a.id);
@@ -229,8 +242,8 @@ export function assertJourney() {
   }).map(s => s.id);
   const badSeason = stops.length < 3 || stops.length > 5 || !SEASON.amb || !SEASON.loanSting || !SEASON.trailer;
   const badSting = PAIRS.filter(p => !p.sting).map(p => `${p.a}:${p.b}`);
-  if (missing.length || extra.length || dup.length || badLead.length || badFlag.length || missingLine.length || badGuest.length || guestDup.length || badPair.length || badStop.length || badSeason || badSting.length) {
-    const msg = JSON.stringify({ missing, extra, dup, badLead, badFlag, missingLine, badGuest, guestDup, badPair, badStop, badSeason, badSting });
+  if (missing.length || extra.length || dup.length || badLead.length || badFlag.length || badPlaque.length || missingLine.length || badGuest.length || guestDup.length || badPair.length || badStop.length || badSeason || badSting.length) {
+    const msg = JSON.stringify({ missing, extra, dup, badLead, badFlag, badPlaque, missingLine, badGuest, guestDup, badPair, badStop, badSeason, badSting });
     throw new Error(`[journey] ${msg}`);
   }
 }

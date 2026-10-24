@@ -128,10 +128,10 @@ export const BEHAVIORS = {
     { id: 'cave', label: '洞穴休憩', hold: 6 },
   ],
   orca: [
+    { id: 'breach', label: '沿冰跃出', hold: 5, view: { dist: 3.2, mobDist: 5.2, frameY: 100, track: true } },
+    { id: 'spyhop', label: '浮窥', hold: 6, view: { pitch: 0.12, dist: 1.8, mobDist: 2.6, track: true } },
     { id: 'wavewash', label: '浪推浮冰', hold: 5 },
     { id: 'hunt', label: '沿冰巡游', hold: 5 },
-    { id: 'breach', label: '鲸跃', hold: 5, view: { dist: 3.2, mobDist: 5.2, frameY: 100, track: true } },
-    { id: 'spyhop', label: '浮窥', hold: 6, view: { pitch: 0.12, dist: 1.8, mobDist: 2.6, track: true } },
   ],
   dolphin: [
     { id: 'leap', label: '跃出水面', hold: 4.5, view: { dist: 3.0, mobDist: 4.8, frameY: 80, track: true } },
@@ -319,10 +319,10 @@ const BEHAVIOR_CAPTION = {
     cave: '它退回岩洞的阴影里，停住。',
   },
   orca: {
-    wavewash: '尾鳍拍向浮冰的边缘，浪从这一头推出去。',
-    hunt: '一头虎鲸沿着冰缘巡过。家族的捕法写在墙上，这一柜只有它。',
-    breach: '它整条跃出水面，再重重落下。',
+    breach: '它沿着冰缘跃出水面，再落回冷水里。',
     spyhop: '头垂直探出水面，看一眼冰上。',
+    wavewash: '尾鳍拍向浮冰的边缘，浪从这一头推出去。',
+    hunt: '一头虎鲸贴着冰缘巡过。',
   },
   dolphin: {
     leap: '它跃出浪尖，在空中弯成一道弧。',

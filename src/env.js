@@ -257,7 +257,7 @@ const MOMENT = {
     },
   },
   orca: {
-    beh: 'hunt',
+    beh: 'breach',
     patch: {
       fog: 0.02, sun: 0.85, rays: 1, surf: 0.8, snowOp: 0.62,
       bed: 0, grass: 0, rocks: 0, caus: 0.2,
