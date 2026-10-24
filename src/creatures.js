@@ -238,7 +238,7 @@ function fetchTemplate(id, onProgress) {
 /** Approximate compressed sizes (bytes) — progress fallback when the server omits Content-Length. */
 const MODEL_BYTES = {
   angler: 466e3, barreleye: 296e3, dumbo: 541e3, gulper: 563e3, hammer: 373e3, jelly: 250e3, nautilus: 445e3, physalia: 312e3, turtle: 607e3, vampire: 711e3, whale: 480e3,
-  great_white: 1705576, manta: 1297932, frilled_shark: 2351492, oarfish: 1614508, clownfish: 1959668, seahorse: 1931980,
+  great_white: 1705576, manta: 1297932, frilled_shark: 2351492, oarfish: 1614508, clownfish: 1959668, seahorse: 1919132,
   sunfish: 1720144, blobfish: 1808484, coelacanth: 1751404, orca: 1344704, dolphin: 1576744, sperm_whale: 1868988,
   leatherback: 2662552, giant_squid: 2212908, octopus: 1969256, lionsmane: 3260888, comb_jelly: 3109988,
   spider_crab: 2454764, mantis_shrimp: 2889640, giant_isopod: 3105960, starfish: 2855076, urchin: 2140244,
@@ -390,59 +390,6 @@ function cloneMaterials(root) {
     if (Array.isArray(o.material)) o.material = o.material.map(m => m.clone());
     else o.material = o.material.clone();
   });
-}
-
-/**
- * Tripo skin weights on the seahorse tear when a thin bone scales or the tail
- * curls hard (grip shreds the mesh; sip stretches the snout into orange spikes).
- * Factors are "how much of the authored delta to keep" (0 = hold the first key / unit scale).
- */
-const CLIP_SOFTEN = {
-  seahorse: {
-    grip: { rot: { tail1: 0.46, tail2: 0.4, tail3: 0.34, tail4: 0.3, tail5: 0.26 } },
-    sip: { scale: { snout: 0, head: 0.15 }, rot: { snout: 0.42 } },
-    brood: { scale: { pouch: 0.12, abdomen: 0.3 } },
-    dance: { scale: { dorsal: 0.35 } },
-  },
-};
-
-function softenClip(id, clip) {
-  const spec = CLIP_SOFTEN[id]?.[clip.name];
-  if (!spec) return clip;
-  let changed = false;
-  const tracks = clip.tracks.map(tr => {
-    const dot = tr.name.lastIndexOf('.');
-    const bone = tr.name.slice(0, dot);
-    const prop = tr.name.slice(dot + 1);
-    if (prop === 'quaternion' && spec.rot) {
-      const k = typeof spec.rot === 'number' ? spec.rot : spec.rot[bone];
-      if (k == null || k >= 0.999) return tr;
-      const values = new Float32Array(tr.values);
-      const q0 = new THREE.Quaternion().fromArray(values, 0).normalize();
-      const q = new THREE.Quaternion();
-      for (let i = 4; i < values.length; i += 4) {
-        q.fromArray(values, i).normalize();
-        if (q0.dot(q) < 0) q.set(-q.x, -q.y, -q.z, -q.w);
-        q0.clone().slerp(q, k).normalize().toArray(values, i);
-      }
-      changed = true;
-      return new THREE.QuaternionKeyframeTrack(tr.name, tr.times, values);
-    }
-    if (prop === 'scale' && spec.scale) {
-      const k = typeof spec.scale === 'number' ? spec.scale : spec.scale[bone];
-      if (k == null || k >= 0.999) return tr;
-      const values = new Float32Array(tr.values);
-      for (let i = 0; i < values.length; i += 3) {
-        values[i] = 1 + (values[i] - 1) * k;
-        values[i + 1] = 1 + (values[i + 1] - 1) * k;
-        values[i + 2] = 1 + (values[i + 2] - 1) * k;
-      }
-      changed = true;
-      return new THREE.VectorKeyframeTrack(tr.name, tr.times, values);
-    }
-    return tr;
-  });
-  return changed ? new THREE.AnimationClip(clip.name, clip.duration, tracks) : clip;
 }
 
 /** Moon jelly GLB is an opaque Tripo shell. Pull it toward a readable bell. */
@@ -634,7 +581,7 @@ export async function loadCreature(id, onProgress) {
       const { outer, k } = wrapModel(raw, fitSize, true);
       if (id === 'gulper') brightenDeepSea(raw);
       const mixer = new THREE.AnimationMixer(raw);
-      const clips = Object.fromEntries(template.animations.map(a => [a.name, softenClip(id, a)]));
+      const clips = Object.fromEntries(template.animations.map(a => [a.name, a]));
       // Bind-pose envelope now; the full clip cloud is deferred so a cold switch can paint.
       const fit = cheapFit(outer, raw);
       const ctrl = makeRiggedUpdater(raw, outer, id, mixer, clips);
